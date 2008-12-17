@@ -1,28 +1,19 @@
 use strict;
 use warnings;
-use Test::More tests => 4;
+use Test::More tests => 2;
 
 BEGIN { use_ok "TryCatch" }
 
-sub foo {
+sub simple_return {
+  #try {
+  #  1+1;
+  #}
   try {
-      return "from foo";
+    #BEGIN { TryCatch::try_inner_postlude() }  
+      return "simple_return";
   };
-  
-  die "shouldn't get here";
-  my $foo = 'bar';
+
+  return "bar";
 }
 
-
-sub dies {
-  try {
-      die "shouldn't get here";
-      return "from foo";
-  };
-  
-  my $foo = 'bar';
-}
-
-
-is('from foo', foo());
-is('bar', dies());
+is(simple_return(), "simple_return");

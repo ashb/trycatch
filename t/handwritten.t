@@ -74,7 +74,7 @@ sub simple_catch_cond {
   #   return "Foo::Error\n"
   # }
 
-  my $__t_c_ret = eval {
+  try my $__t_c_ret = eval {
     if ($_[0]) {
       Foo::Error->throw;
     } else {
@@ -100,6 +100,8 @@ sub simple_catch_cond {
   if (!ref($__t_c_ret) || $__t_c_ret != $TryCatch::SPECIAL_VALUE) {
     return $__t_c_ret;
   }
+
+  return "bar";
 }
 
 is(simple_return(), "simple_return");
