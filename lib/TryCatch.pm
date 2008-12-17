@@ -26,26 +26,29 @@ use Sub::Exporter -setup => {
 
 use Devel::Declare ();
 use B::Hooks::EndOfScope;
+use B::Hooks::Parser;
+use Devel::Declare::Context::Simple;
 
-sub try (&) {}
+sub try () {}
 
 # Replace try with an actual eval call;
 sub _parse_try {
-  my ($pack) = @_;
+  my $pack = shift;
 
-  on_scope_end {
-    geif_semicolon();
+  my $ctx = Devel::Declare::Context::Simple->new->init(@_);
+
+  if (my $len = Devel::Declare::toke_scan_ident( $ctx->offset )) {
+    my $linestr = $ctx->get_linestr();
+    substr( $linestr, $ctx->offset, $len ) = 'try; eval';
+    $ctx->set_linestr($linestr);
   }
+  
+  $ctx->skip_declarator;
+  $ctx->inject_if_block(q{ BEGIN { TryCatch::geif_semicolon() } });
 }
 
 
 sub geif_semicolon {
-  my $offset = Devel::Declare::get_linestr_offset();
-  $offset += Devel::Declare::toke_skipspace($offset);
-  my $linestr = Devel::Declare::get_linestr();
-
-  $offset = Devel::Declare::get_linestr_offset();
-  substr( $linestr, $offset, 0 ) = ';';
-  Devel::Declare::set_linestr($linestr);
+  B::Hooks::Parser::inject(';');
 }
 1;
