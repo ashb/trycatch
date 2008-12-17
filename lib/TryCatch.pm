@@ -41,27 +41,20 @@ sub _parse_try {
 
   if (my $len = Devel::Declare::toke_scan_ident( $ctx->offset )) {
     $ctx->inc_offset($len);
-    $ctx->inject_if_block(q{ BEGIN { TryCatch::try_inner_postlude() } },
-    #$ctx->inject_if_block(q{},
-                          '; my $__t_c_ret = eval');
-    print("1= '@{[Devel::Declare::get_linestr()]}'\n\n");
+    $ctx->skipspace;
+    my $ret = $ctx->inject_if_block(
+      q# BEGIN { TryCatch::try_postlude() } { BEGIN {TryCatch::try_inner_postlude() } #,
+      '; my $__t_c_ret = eval');
   }
   
 }
 
 sub try_inner_postlude {
-  0 && on_scope_end {
+  on_scope_end {
     my $offset = Devel::Declare::get_linestr_offset();
     $offset += Devel::Declare::toke_skipspace($offset);
     my $linestr = Devel::Declare::get_linestr();
-    print("2.1= '$linestr'\n\n");
-    substr($linestr, $offset, 0) =
-    q#
-      }
-      return $TryCatch::SPECIAL_VALUE;
-      BEGIN { TryCatch::try_postlude() }
-      #;
-    print("2= '$linestr'\n\n");
+    substr($linestr, $offset, 0) = q# return $TryCatch::SPECIAL_VALUE; }#;
     Devel::Declare::set_linestr($linestr);
   }
 }
@@ -90,6 +83,5 @@ sub try_postlude_block {
     Devel::Declare::set_linestr($linestr);
   }
   $linestr = Devel::Declare::get_linestr();
-  print("3= '$linestr'\n");
 }
 1;

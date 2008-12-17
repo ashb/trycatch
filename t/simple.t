@@ -9,9 +9,8 @@ sub simple_return {
   #  1+1;
   #}
   try {
-    #BEGIN { TryCatch::try_inner_postlude() }  
-      return "simple_return";
-  };
+    return "simple_return";
+  }
 
   return "bar";
 }
