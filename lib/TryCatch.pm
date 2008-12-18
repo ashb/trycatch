@@ -3,8 +3,8 @@ package TryCatch;
 use strict;
 use warnings;
 use Sub::Exporter -setup => {
-  exports => [qw/try/],
-  groups => { default => [qw/try/] },
+  exports => [qw/try catch/],
+  groups => { default => [qw/try catch/] },
   installer => sub {
     my ($args, $to_export) = @_;
     my $pack = $args->{into};
@@ -33,6 +33,15 @@ use Devel::Declare::Context::Simple;
 
 sub try {}
 
+sub catch {}
+
+sub foobar{
+  my ($cond, $err) = @_;
+
+  local *_ = \$err;
+  return $cond->($err);
+}
+
 # Replace try with an actual eval call;
 sub _parse_try {
   my $pack = shift;
@@ -47,6 +56,14 @@ sub _parse_try {
       '; my $__t_c_ret = eval');
   }
   
+}
+
+sub _parse_catch {
+  my $pack = shift;
+  my $ctx = Devel::Declare::Context::Simple->new->init(@_);
+  my $str = $ctx->get_linestr;
+  my $proto = $ctx->strip_proto || "";
+  warn "proto = $proto\n";
 }
 
 sub try_inner_postlude {
@@ -74,7 +91,18 @@ sub try_postlude_block {
 
   $offset = Devel::Declare::get_linestr_offset();
 
+  my $ctx = Devel::Declare::Context::Simple->new->init($toke, $offset);
+
   if ($toke eq 'catch') {
+    $ctx->inc_offset(length($toke));
+    $ctx->skipspace;
+    my $str = '; if (my $__t_c_error = $@) { my $e = $@; '; 
+
+    #TODO: Check a { is next thing
+    substr( $linestr, $offset, $ctx->offset - $offset +1 ) = $str;
+
+    $ctx->set_linestr($linestr);
+
   } elsif ($toke eq 'finally') {
   } else {
     my $str = '; return $__t_c_ret if !ref($__t_c_ret) || $__t_c_ret != $TryCatch::SPECIAL_VALUE;'; 
@@ -82,6 +110,5 @@ sub try_postlude_block {
 
     Devel::Declare::set_linestr($linestr);
   }
-  $linestr = Devel::Declare::get_linestr();
 }
 1;
