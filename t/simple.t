@@ -22,8 +22,23 @@ sub simple_catch {
     die "Foo\n";
     return "Shouldn't get here";
   }
-  catch {
+  catch (Str $e) {
     return "str_error: $e";
+  }
+
+  return "Shouldn't get here either";
+}
+
+sub catch_2 {
+  try {
+    die "Foo\n";
+    return "Shouldn't get here";
+  }
+  catch (Foobar $err) {
+    return "dont want this";
+  }
+  catch (Str $err) {
+    return "str_error: $err";
   }
 
   return "Shouldn't get here either";

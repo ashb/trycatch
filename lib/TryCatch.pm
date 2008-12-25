@@ -15,6 +15,9 @@ use Sub::Exporter -setup => {
           { $name => { const => sub { $parser->($pack, @_) } } },
         );
       }
+      if (my $code = __PACKAGE__->can("_extras_for_${name}")) {
+        $code->($pack);
+      }
     }
     Sub::Exporter::default_installer(@_);
 
@@ -68,14 +71,6 @@ sub _parse_try {
   
 }
 
-sub _parse_catch {
-  my $pack = shift;
-  my $ctx = Devel::Declare::Context::Simple->new->init(@_);
-  my $str = $ctx->get_linestr;
-  my $proto = $ctx->strip_proto || "";
-  warn "proto = $proto\n";
-}
-
 sub try_inner_postlude {
   on_scope_end {
     my $offset = Devel::Declare::get_linestr_offset();
@@ -89,6 +84,11 @@ sub try_inner_postlude {
 sub try_postlude {
   on_scope_end { try_postlude_block() }
 }
+
+sub catch_postlude {
+  on_scope_end { catch_postlude_block() }
+}
+
 sub try_postlude_block {
   my $offset = Devel::Declare::get_linestr_offset();
   $offset += Devel::Declare::toke_skipspace($offset);
@@ -121,10 +121,38 @@ sub try_postlude_block {
   }
 }
 
+sub catch_postlude_block {
+
+  my $linestr = Devel::Declare::get_linestr();
+  my $offset = Devel::Declare::get_linestr_offset();
+
+  print "post catch: '$linestr'\noffset = $offset\n";
+  $offset += Devel::Declare::toke_skipspace($offset);
+
+  my $toke = '';
+  my $len = 0;
+  if ($len = Devel::Declare::toke_scan_word($offset, 1 )) {
+    $toke = substr( $linestr, $offset, $len );
+  }
+
+
+  if ($toke eq 'catch') {
+    my $ctx = Devel::Declare::Context::Simple->new->init($toke, $offset);
+    substr( $linestr, $offset, $len ) = '';
+    $ctx->set_linestr($linestr);
+    $ctx->inc_offset(1);
+    $ctx->skipspace;
+    process_catch($ctx, 0);
+  }
+}
+
+
 sub process_catch {
   my ($ctx, $first) = @_;
   
   my $linestr = $ctx->get_linestr;
+  my $sub = substr($linestr, $ctx->offset);
+  print("process_catch: $first '$sub'\n");
 
   if (substr($linestr, $ctx->offset, 1) eq '(') {
     my ($param, $left) = SlimSignature->param(
@@ -162,15 +190,20 @@ sub process_catch {
     substr($linestr, $ctx->offset, 1) = $code;
 
     $ctx->set_linestr($linestr);
+    $ctx->inc_offset(length($code));
   } else {
     my $str;
     $str = 'else ' unless $first;
-    $str .= 'if (my $e = $@) { '; 
+    $str .= 'if ($@)'; 
 
     #TODO: Check a { is next thing
     substr( $linestr, $ctx->offset, 1 ) = $str;
 
     $ctx->set_linestr($linestr);
+    $ctx->inc_offset(length($str));
   }
+  print("linestr = '" .
+    substr($linestr, $ctx->offset) . "'\n");
+  $ctx->inject_if_block( 'BEGIN { TryCatch::catch_postlude() }');
 }
 1;
