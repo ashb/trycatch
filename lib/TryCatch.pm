@@ -2,6 +2,15 @@ package TryCatch;
 
 use strict;
 use warnings;
+
+use base 'DynaLoader';
+
+our $VERSION = '1.000000';
+
+sub dl_load_flags { 0x01 }
+
+__PACKAGE__->bootstrap($VERSION);
+
 use Sub::Exporter -setup => {
   exports => [qw/try/],
   groups => { default => [qw/try/] },
@@ -29,12 +38,16 @@ our $SPECIAL_VALUE = \"no return";
 
 use Devel::Declare ();
 use B::Hooks::EndOfScope;
-use B::Hooks::Parser;
 use Devel::Declare::Context::Simple;
-use SlimSignature;
+#use Parse::Method::Signautres;
 use Moose::Util::TypeConstraints;
+use Scope::Upper qw/unwind want_at/;
 
-sub try {}
+sub try ($) {
+  my @ret = TryCatch::XS::_monitor_return($_[0], want_at(1));
+  #print("_monitor_return returned @ret @{[scalar @ret]}\n");
+  unwind @ret, 1 if pop @ret;
+}
 
 # This might be what catch should be
 sub catch{
@@ -55,7 +68,7 @@ sub catch{
   return $err if $cond->($err);
 }
 
-# Replace try with an actual eval call;
+# Replace try {} with an try sub {};
 sub _parse_try {
   my $pack = shift;
 
@@ -65,8 +78,9 @@ sub _parse_try {
     $ctx->inc_offset($len);
     $ctx->skipspace;
     my $ret = $ctx->inject_if_block(
-      q# BEGIN { TryCatch::try_postlude() } { BEGIN {TryCatch::try_inner_postlude() } #,
-      '; my $__t_c_ret = eval');
+      q# BEGIN { TryCatch::try_postlude() } #,
+      'sub '
+    );
   }
   
 }
@@ -114,7 +128,7 @@ sub try_postlude_block {
 
   } elsif ($toke eq 'finally') {
   } else {
-    my $str = '; return $__t_c_ret if !ref($__t_c_ret) || $__t_c_ret != $TryCatch::SPECIAL_VALUE;'; 
+    my $str = ';';# return $__t_c_ret if !ref($__t_c_ret) || $__t_c_ret != $TryCatch::SPECIAL_VALUE;'; 
     substr( $linestr, $offset, 0 ) = $str;
 
     $ctx->set_linestr($linestr);
@@ -155,7 +169,7 @@ sub process_catch {
   print("process_catch: $first '$sub'\n");
 
   if (substr($linestr, $ctx->offset, 1) eq '(') {
-    my ($param, $left) = SlimSignature->param(
+    my ($param, $left) = ( # TODO: Parse::Method::Signatures->param
       input => $linestr,
       offset => $ctx->offset+1 );
 
@@ -206,4 +220,19 @@ sub process_catch {
     substr($linestr, $ctx->offset) . "'\n");
   $ctx->inject_if_block( 'BEGIN { TryCatch::catch_postlude() }');
 }
+
 1;
+
+__END__
+
+=head1 NAME
+
+TryCatch - first class try catch semantics for Perl, with no source filters.
+
+=head1 AUTHOR
+
+Ash Berlin <ash@cpan.org>
+
+=head1 LICENSE
+
+Licensed under the same terms as Perl itself.
