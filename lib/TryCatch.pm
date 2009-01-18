@@ -33,20 +33,19 @@ use Sub::Exporter -setup => {
   }
 };
 
-# Used to detect when there is an explicity return from an eval block
-our $SPECIAL_VALUE = \"no return";
-
 use Devel::Declare ();
 use B::Hooks::EndOfScope;
 use Devel::Declare::Context::Simple;
 #use Parse::Method::Signautres;
 use Moose::Util::TypeConstraints;
-use Scope::Upper qw/unwind want_at/;
+use Scope::Upper qw/unwind want_at :words/;
 
 sub try ($) {
-  my @ret = TryCatch::XS::_monitor_return($_[0], want_at(1));
-  #print("_monitor_return returned @ret @{[scalar @ret]}\n");
-  unwind @ret, 1 if pop @ret;
+  my $ctx = SUB(CALLER(1));
+  my @ret = TryCatch::XS::_monitor_return($_[0], want_at( $ctx ));
+  #print("_monitor_return returned '@ret' (@{[scalar @ret]})\n");
+  unwind @ret => $ctx if pop @ret;
+  return;
 }
 
 # This might be what catch should be

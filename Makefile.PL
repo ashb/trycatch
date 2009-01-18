@@ -12,7 +12,7 @@ requires 'Parse::Method::Signatures';
 requires 'B::Hooks::EndOfScope' => 0.05;
 requires 'Devel::Declare';
 requires 'Moose';
-requires 'Scope::Upper' => 0.04;
+requires 'Scope::Upper' => 0.06;
 
 WriteAll;
 
