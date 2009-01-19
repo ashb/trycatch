@@ -148,8 +148,6 @@ sub process_catch {
   my $linestr = $ctx->get_linestr;
   $ctx->skipspace;
 
-  print "linestr = '$linestr'\n";
-
   substr($linestr, $ctx->offset, 0) = ')->';
   $ctx->set_linestr($linestr);
   $ctx->inc_offset(length(")->") + length "catch");
