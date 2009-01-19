@@ -40,31 +40,18 @@ use Devel::Declare::Context::Simple;
 use Moose::Util::TypeConstraints;
 use Scope::Upper qw/unwind want_at :words/;
 
-sub try ($) {
+
+
+sub try {
+  my ($sub, $terminal) = @_;
+
+  local $@;
   my $ctx = SUB(CALLER(1));
-  my @ret = TryCatch::XS::_monitor_return($_[0], want_at( $ctx ));
-  #print("_monitor_return returned '@ret' (@{[scalar @ret]})\n");
+  my @ret = TryCatch::XS::_monitor_return( $sub, want_at( $ctx ), 1);
   unwind @ret => $ctx if pop @ret;
-  return;
-}
 
-# This might be what catch should be
-sub catch{
-  my ($cond, $err, $tc) = @_;
-
-  local $@ = $@;
-  local *_ = \$err;
-
-  if (defined $tc) {
-    my $type = Moose::Util::TypeConstraints::find_or_create_isa_type_constraint($tc);
-    unless ($type) {
-      warn "Couldn't convert '$tc' to a type constraint";
-      return
-    }
-
-    return unless $type->check($err);
-  }
-  return $err if $cond->($err);
+  return "TryCatch::Exception::Handled" unless defined($@);
+  return bless { error => $@ }, "TryCatch::Exception";
 }
 
 # Replace try {} with an try sub {};

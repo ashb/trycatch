@@ -41,9 +41,10 @@ BOOT:
 }
 
 void
-_monitor_return(code, array_ctx)
+_monitor_return(code, array_ctx, eval)
 SV* code;
 SV* array_ctx; // Desired wantarray context;
+SV*  eval;
   PROTOTYPE: DISABLE
   PREINIT:
     dMY_CXT;
@@ -56,10 +57,22 @@ SV* array_ctx; // Desired wantarray context;
 
     ctx =  SvTRUE(array_ctx) ? G_ARRAY :
            array_ctx != &PL_sv_undef ? G_SCALAR: G_VOID;
+    if (SvTRUE(eval))
+      ctx |= G_EVAL;
 
     ret = call_sv(code, ctx);
   
     SPAGAIN;
+
+    if ( (ctx & G_EVAL) && SvTRUE(ERRSV)) {
+      while (ret) {
+        POPs;
+        ret--;
+      }
+      XPUSHs(&PL_sv_no);
+      XSRETURN(1);
+    }
+
     PL_runops = MY_CXT.old_runops;
     XPUSHs(MY_CXT.prev_op_is_return ? &PL_sv_yes : &PL_sv_no);
     XSRETURN(1+ret);
