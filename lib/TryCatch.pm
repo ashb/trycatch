@@ -24,9 +24,9 @@ use Sub::Exporter -setup => {
           { $name => { const => sub { $parser->($pack, @_) } } },
         );
       }
-      if (my $code = __PACKAGE__->can("_extras_for_${name}")) {
-        $code->($pack);
-      }
+      #if (my $code = __PACKAGE__->can("_extras_for_${name}")) {
+      #  $code->($pack);
+      #}
     }
     Sub::Exporter::default_installer(@_);
 
@@ -36,9 +36,11 @@ use Sub::Exporter -setup => {
 use Devel::Declare ();
 use B::Hooks::EndOfScope;
 use Devel::Declare::Context::Simple;
-#use Parse::Method::Signautres;
+use Parse::Method::Signatures;
 use Moose::Util::TypeConstraints;
 use Scope::Upper qw/unwind want_at :words/;
+use TryCatch::Exception;
+use Carp qw/croak/;
 
 
 
@@ -54,31 +56,29 @@ sub try {
   return bless { error => $@ }, "TryCatch::Exception";
 }
 
-# Replace try {} with an try sub {};
+
+# Replace 'try {' with an 'try (sub {'
 sub _parse_try {
   my $pack = shift;
+
+  # Hide Devel::Declare from carp;
+  local $Carp::Internal{'Devel::Declare'} = 1;
 
   my $ctx = Devel::Declare::Context::Simple->new->init(@_);
 
   if (my $len = Devel::Declare::toke_scan_ident( $ctx->offset )) {
     $ctx->inc_offset($len);
     $ctx->skipspace;
-    my $ret = $ctx->inject_if_block(
-      q# BEGIN { TryCatch::try_postlude() } #,
-      'sub '
-    );
+
+    my $linestr = $ctx->get_linestr;
+    croak "block required after try"
+      unless substr($linestr, $ctx->offset, 1) eq '{';
+
+    substr($linestr, $ctx->offset+1,0) = q# BEGIN { TryCatch::try_postlude() }#;
+    substr($linestr, $ctx->offset,0) = q#(sub #;
+    $ctx->set_linestr($linestr);
   }
   
-}
-
-sub try_inner_postlude {
-  on_scope_end {
-    my $offset = Devel::Declare::get_linestr_offset();
-    $offset += Devel::Declare::toke_skipspace($offset);
-    my $linestr = Devel::Declare::get_linestr();
-    substr($linestr, $offset, 0) = q# return $TryCatch::SPECIAL_VALUE; }#;
-    Devel::Declare::set_linestr($linestr);
-  }
 }
 
 sub try_postlude {
@@ -106,15 +106,11 @@ sub try_postlude_block {
 
   if ($toke eq 'catch') {
 
-    substr( $linestr, $offset, $len ) = ';';
-    $ctx->set_linestr($linestr);
-    $ctx->inc_offset(1);
-    $ctx->skipspace;
     process_catch($ctx, 1);
 
   } elsif ($toke eq 'finally') {
   } else {
-    my $str = ';';# return $__t_c_ret if !ref($__t_c_ret) || $__t_c_ret != $TryCatch::SPECIAL_VALUE;'; 
+    my $str = ',"empty");';
     substr( $linestr, $offset, 0 ) = $str;
 
     $ctx->set_linestr($linestr);
@@ -126,9 +122,6 @@ sub catch_postlude_block {
   my $linestr = Devel::Declare::get_linestr();
   my $offset = Devel::Declare::get_linestr_offset();
 
-  print "post catch: '$linestr'\noffset = $offset\n";
-  $offset += Devel::Declare::toke_skipspace($offset);
-
   my $toke = '';
   my $len = 0;
   if ($len = Devel::Declare::toke_scan_word($offset, 1 )) {
@@ -138,74 +131,62 @@ sub catch_postlude_block {
 
   if ($toke eq 'catch') {
     my $ctx = Devel::Declare::Context::Simple->new->init($toke, $offset);
-    substr( $linestr, $offset, $len ) = '';
-    $ctx->set_linestr($linestr);
-    $ctx->inc_offset(1);
-    $ctx->skipspace;
     process_catch($ctx, 0);
+  } else {
+    substr($linestr, $offset, 0) = ");";
+    Devel::Declare::set_linestr($linestr);
   }
 }
 
-
+# turn 'catch() {' into '->catch({ TC_check_code;'
 sub process_catch {
-  my ($ctx, $first) = @_;
-  
+  my ($ctx) = @_;
+
+  # Hide Devel::Declare from carp;
+  local $Carp::Internal{'Devel::Declare'} = 1;
+
   my $linestr = $ctx->get_linestr;
-  my $sub = substr($linestr, $ctx->offset);
-  print("process_catch: $first '$sub'\n");
+  $ctx->skipspace;
 
+  print "linestr = '$linestr'\n";
+
+  substr($linestr, $ctx->offset, 0) = ')->';
+  $ctx->set_linestr($linestr);
+  $ctx->inc_offset(length(")->") + length "catch");
+  $ctx->skipspace;
+
+  my $tc_code = "";
+  # optional ()
   if (substr($linestr, $ctx->offset, 1) eq '(') {
-    my ($param, $left) = ( # TODO: Parse::Method::Signatures->param
-      input => $linestr,
-      offset => $ctx->offset+1 );
+    my $substr = substr($linestr, $ctx->offset+1);
+    local $@;
+    my ($param, $left) = eval { Parse::Method::Signatures->param($substr) };
+    if ($@) {
+      die $@;
+    }
+    $tc_code .= 'my ' . $param->variable_name . ' = $@;';
 
-    substr($linestr, $ctx->offset, length($linestr) - ($ctx->offset + length($left)), '');
+    substr($linestr, $ctx->offset, length($linestr) - $ctx->offset - length($left), '');
     $ctx->set_linestr($linestr);
     $ctx->skipspace;
-
     if (substr($linestr, $ctx->offset, 1) ne ')') {
-      die "')' expected after catch condition: $linestr\n";
+      croak "')' expected after catch condition: $linestr\n";
     }
+
     substr($linestr, $ctx->offset, 1, '');
     $ctx->set_linestr($linestr);
-
-    my $code;
-    $code = 'else ' unless $first;
-
-    $code .= 'if( my '
-           . ($param->{var} || '$e')
-           . ' = TryCatch::catch(';
-    if ($param->{where}) {
-      $code .= $param->{where}[0];
-    } else {
-      $code .= 'sub { 1 }'
-    }
-    $code .= ', $@';
-    if ($param->{tc}) {
-      $code .= ', \'' . $param->{tc} . '\''
-    }
-
-    $code .= ')) ';
-
-    substr($linestr, $ctx->offset, 1) = $code;
-
-    $ctx->set_linestr($linestr);
-    $ctx->inc_offset(length($code));
-  } else {
-    my $str;
-    $str = 'else ' unless $first;
-    $str .= 'if ($@)'; 
-
-    #TODO: Check a { is next thing
-    substr( $linestr, $ctx->offset, 1 ) = $str;
-
-    $ctx->set_linestr($linestr);
-    $ctx->inc_offset(length($str));
+    $ctx->skipspace;
   }
-  print("linestr = '" .
-    substr($linestr, $ctx->offset) . "'\n");
-  $ctx->inject_if_block( 'BEGIN { TryCatch::catch_postlude() }');
+
+  croak "block required after catch"
+    unless substr($linestr, $ctx->offset, 1) eq '{';
+
+  substr($linestr, $ctx->offset+1,0) = 
+    q# BEGIN { TryCatch::catch_postlude() };# . $tc_code;
+  substr($linestr, $ctx->offset,0) = q#(sub #;
+  $ctx->set_linestr($linestr);
 }
+
 
 1;
 
