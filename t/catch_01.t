@@ -2,12 +2,13 @@ use strict;
 use warnings;
 use Test::More tests => 3;
 
-BEGIN { use_ok "TryCatch" } or BAIL_OUT("Cannot load TryCatch");
+BEGIN { use_ok "TryCatch" or BAIL_OUT("Cannot load TryCatch") };
+#use TryCatch;
 
 sub simple_no_die {
   try {
     return "simple_return";
-  }
+       } # foo
   catch {
     die "Shouldn't get here\n";
   }
@@ -15,6 +16,7 @@ sub simple_no_die {
   print("foo\n");
   return "bar";
 }
+
 
 sub simple_die {
   try {

@@ -6,6 +6,7 @@ use warnings;
 use base 'DynaLoader';
 
 our $VERSION = '1.000000';
+our $PARSE_CATCH_NEXT = 0;
 
 sub dl_load_flags { 0x01 }
 
@@ -24,9 +25,9 @@ use Sub::Exporter -setup => {
           { $name => { const => sub { $parser->($pack, @_) } } },
         );
       }
-      #if (my $code = __PACKAGE__->can("_extras_for_${name}")) {
-      #  $code->($pack);
-      #}
+      if (my $code = __PACKAGE__->can("_extras_for_${name}")) {
+        $code->($pack);
+      }
     }
     Sub::Exporter::default_installer(@_);
 
@@ -56,6 +57,14 @@ sub try {
   return bless { error => $@ }, "TryCatch::Exception";
 }
 
+sub _extras_for_try {
+  my ($pack) = @_;
+
+  Devel::Declare->setup_for(
+    $pack,
+    { catch => { const => sub { _parse_catch($pack, @_) } } }
+  );
+}
 
 # Replace 'try {' with an 'try (sub {'
 sub _parse_try {
@@ -90,6 +99,7 @@ sub catch_postlude {
 }
 
 sub try_postlude_block {
+
   my $offset = Devel::Declare::get_linestr_offset();
   $offset += Devel::Declare::toke_skipspace($offset);
   my $linestr = Devel::Declare::get_linestr();
@@ -106,7 +116,10 @@ sub try_postlude_block {
 
   if ($toke eq 'catch') {
 
-    process_catch($ctx, 1);
+    $ctx->skipspace;
+    substr($linestr, $ctx->offset, 0) = ')->';
+    $ctx->set_linestr($linestr);
+    $TryCatch::PARSE_CATCH_NEXT = 1;
 
   } elsif ($toke eq 'finally') {
   } else {
@@ -128,10 +141,16 @@ sub catch_postlude_block {
     $toke = substr( $linestr, $offset, $len );
   }
 
+  $offset = Devel::Declare::get_linestr_offset();
+
+  my $ctx = Devel::Declare::Context::Simple->new->init($toke, $offset);
 
   if ($toke eq 'catch') {
-    my $ctx = Devel::Declare::Context::Simple->new->init($toke, $offset);
-    process_catch($ctx, 0);
+
+    $ctx->skipspace;
+    substr($linestr, $ctx->offset, 0) = ')->';
+    $ctx->set_linestr($linestr);
+    $TryCatch::PARSE_CATCH_NEXT = 1;
   } else {
     substr($linestr, $offset, 0) = ");";
     Devel::Declare::set_linestr($linestr);
@@ -139,36 +158,44 @@ sub catch_postlude_block {
 }
 
 # turn 'catch() {' into '->catch({ TC_check_code;'
-sub process_catch {
-  my ($ctx) = @_;
+# the '->' is added by one of the postlude hooks
+sub _parse_catch {
+  my $pack = shift;
+  my $ctx = Devel::Declare::Context::Simple->new->init(@_);
+
+  return unless $TryCatch::PARSE_CATCH_NEXT;
+  $TryCatch::PARSE_CATCH_NEXT = 0;
 
   # Hide Devel::Declare from carp;
   local $Carp::Internal{'Devel::Declare'} = 1;
+  local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
+  local $Carp::Internal{'TryCatch'} = 1;
 
-  my $linestr = $ctx->get_linestr;
   $ctx->skipspace;
+  my $linestr = $ctx->get_linestr;
 
-  substr($linestr, $ctx->offset, 0) = ')->';
-  $ctx->set_linestr($linestr);
-  $ctx->inc_offset(length(")->") + length "catch");
+  my $len = length "->catch";
+  my $sub = substr($linestr, $ctx->offset, $len);
+  die "_parse_catch expects to find '->catch' in linestr, found: "  
+    . substr($linestr, $ctx->offset, $len)
+    unless $sub eq '->catch';
+
+  $ctx->inc_offset($len);
   $ctx->skipspace;
 
   my $tc_code = "";
   # optional ()
   if (substr($linestr, $ctx->offset, 1) eq '(') {
     my $substr = substr($linestr, $ctx->offset+1);
-    local $@;
-    my ($param, $left) = eval { Parse::Method::Signatures->param($substr) };
-    if ($@) {
-      die $@;
-    }
+    my ($param, $left) = Parse::Method::Signatures->param($substr);
+  
     $tc_code .= 'my ' . $param->variable_name . ' = $@;';
 
     substr($linestr, $ctx->offset, length($linestr) - $ctx->offset - length($left), '');
     $ctx->set_linestr($linestr);
     $ctx->skipspace;
     if (substr($linestr, $ctx->offset, 1) ne ')') {
-      croak "')' expected after catch condition: $linestr\n";
+      croak "')' expected after catch signature";
     }
 
     substr($linestr, $ctx->offset, 1, '');
@@ -180,7 +207,7 @@ sub process_catch {
     unless substr($linestr, $ctx->offset, 1) eq '{';
 
   substr($linestr, $ctx->offset+1,0) = 
-    q# BEGIN { TryCatch::catch_postlude() };# . $tc_code;
+    q# BEGIN { TryCatch::catch_postlude() }# . $tc_code;
   substr($linestr, $ctx->offset,0) = q#(sub #;
   $ctx->set_linestr($linestr);
 }
