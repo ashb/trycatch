@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 5;
+use Test::More tests => 6;
 use Test::Exception;
 
 BEGIN { use_ok "TryCatch" or BAIL_OUT("Cannot load TryCatch") };
@@ -63,3 +63,16 @@ like $@,
      qr!^'\)' required after catch signature at \(eval \d+\) line \d+!,
      "invalid catch signature (missing parenthesis)";
 }
+
+
+eval <<'EOC';
+  use TryCatch;
+
+  try { } bar
+  catch {}
+
+EOC
+
+like $@, 
+     qr!^Can't locate object method "bar" via package "catch" .*?at \(eval \d+\) line \d+\.?$!,
+     "bareword between try and catch";
