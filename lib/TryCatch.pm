@@ -51,10 +51,16 @@ sub try {
   my ($sub, $terminal) = @_;
 
   local $@;
-  my $ctx = SUB(CALLER(1));
-  my @ret = $sub->(); #TryCatch::XS::call_in_context( $sub, want_at( $ctx ), 1);
-  print "ret = '@ret'\n";
-  #unwind @ret => $ctx if pop @ret;
+  my $ctx = want_at SUB(CALLER(1));
+  if ($ctx) {
+    my @ret = $sub->(); 
+  } elsif (defined $ctx) {
+    my $ret = $sub->();
+  } else {
+    $sub->();
+  }
+
+  # If we get here there was either no explicit return or an error
 
   return "TryCatch::Exception::Handled" unless defined($@);
   return bless { error => $@ }, "TryCatch::Exception";
@@ -210,7 +216,7 @@ sub _parse_catch {
   if (substr($linestr, $ctx->offset, 1) eq '(') {
     my $substr = substr($linestr, $ctx->offset+1);
     my ($param, $left) = Parse::Method::Signatures->param($substr);
-  
+ 
     $tc_code .= 'my ' . $param->variable_name . ' = $@;';
 
     substr($linestr, $ctx->offset, length($linestr) - $ctx->offset - length($left), '');

@@ -9,11 +9,9 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   dSP;
   SV* ctx;
   CV *unwind;
+  OP *new_op;
 
-  printf("unwind_return\n");
-  op_dump(op);
   PERL_UNUSED_VAR(user_data);
-  //sv_dump(TOPs);
 
   ENTER;
   PUSHMARK(SP);
@@ -24,23 +22,16 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
 
   SPAGAIN;
 
-  // I probably dont need to POP,inc then push
-  ctx = POPs;
-  SvREFCNT_inc(ctx);
-
 
   // call_pv("Scope::Upper::unwind", G_VOID);
   // Can't use call_sv et al. since it resets PL_op.
  
   unwind = get_cv("Scope::Upper::unwind", 0);
-  XPUSHs(ctx);
   XPUSHs( (SV*)unwind);
+  PUTBACK;
 
   CALL_FPTR(PL_ppaddr[OP_ENTERSUB])(aTHX);
-  
-  SvREFCNT_dec(ctx);
-  printf("final PL_op:\n");
-  op_dump(PL_op);
+
   return PL_op->op_next;
 }
 
@@ -48,7 +39,6 @@ STATIC OP* check_return (pTHX_ OP *op, void *user_data) {
   PERL_UNUSED_VAR(user_data);
 
   hook_op_ppaddr(op, unwind_return, NULL);
-  printf("return op checked\n");
   return op;
 }
 
