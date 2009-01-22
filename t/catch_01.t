@@ -13,7 +13,7 @@ sub simple_no_die {
     die "Shouldn't get here\n";
   }
 
-  print("foo\n");
+  diag("foo\n");
   return "bar";
 }
 

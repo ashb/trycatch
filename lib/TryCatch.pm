@@ -4,9 +4,11 @@ use strict;
 use warnings;
 
 use base 'DynaLoader';
+use B::Hooks::OP::PPAddr;
 
 our $VERSION = '1.000000';
 our $PARSE_CATCH_NEXT = 0;
+our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH);
 
 sub dl_load_flags { 0x01 }
 
@@ -44,18 +46,21 @@ use TryCatch::Exception;
 use Carp qw/croak/;
 
 
-
+# The actual try call itself. Nothing to do with parsing.
 sub try {
   my ($sub, $terminal) = @_;
 
   local $@;
   my $ctx = SUB(CALLER(1));
-  my @ret = TryCatch::XS::_monitor_return( $sub, want_at( $ctx ), 1);
-  unwind @ret => $ctx if pop @ret;
+  my @ret = $sub->(); #TryCatch::XS::call_in_context( $sub, want_at( $ctx ), 1);
+  print "ret = '@ret'\n";
+  #unwind @ret => $ctx if pop @ret;
 
   return "TryCatch::Exception::Handled" unless defined($@);
   return bless { error => $@ }, "TryCatch::Exception";
 }
+
+# From here on out its parsing methods.
 
 sub _extras_for_try {
   my ($pack) = @_;
@@ -86,6 +91,14 @@ sub _parse_try {
     substr($linestr, $ctx->offset+1,0) = q# BEGIN { TryCatch::try_postlude() }#;
     substr($linestr, $ctx->offset,0) = q#(sub #;
     $ctx->set_linestr($linestr);
+
+    if (!$CHECK_OP_DEPTH) {
+      $CHECK_OP_DEPTH = 1;
+      $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
+    } else {
+      $CHECK_OP_DEPTH++;
+    }
+
   }
   
 }
@@ -98,6 +111,7 @@ sub catch_postlude {
   on_scope_end { catch_postlude_block() }
 }
 
+# stick ')->' or ');' on after the '}' as needed
 sub try_postlude_block {
 
   my $offset = Devel::Declare::get_linestr_offset();
@@ -121,12 +135,16 @@ sub try_postlude_block {
     $ctx->set_linestr($linestr);
     $TryCatch::PARSE_CATCH_NEXT = 1;
 
-  } elsif ($toke eq 'finally') {
+  #} elsif ($toke eq 'finally') {
   } else {
     my $str = ',"empty");';
     substr( $linestr, $offset, 0 ) = $str;
 
     $ctx->set_linestr($linestr);
+
+    if (--$CHECK_OP_DEPTH == 0) {
+      TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
+    }
   }
 }
 
@@ -154,6 +172,10 @@ sub catch_postlude_block {
   } else {
     substr($linestr, $offset, 0) = ");";
     Devel::Declare::set_linestr($linestr);
+
+    if (--$CHECK_OP_DEPTH == 0) {
+      TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
+    }
   }
 }
 

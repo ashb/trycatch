@@ -9,17 +9,19 @@ sub simple_return {
     return "simple_return";
   }
 
-  print("foo\n");
-  return "bar";
-}
-sub simple_no_return {
-  try {
-    "simple_return"; # Not a return op
-  }
-
+  die("foo\n");
   return "bar";
 }
 
-is(simple_return(), "simple_return");
-is(simple_no_return(), "bar");
+#sub simple_no_return {
+#  try {
+#    "simple_return"; # Not a return op
+#  }
+#
+#  return "bar";
+#}
+
+#is(simple_return(), "simple_return");
+simple_return();
+#is(simple_no_return(), "bar");
 
