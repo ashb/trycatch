@@ -7,15 +7,12 @@
 
 STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   dSP;
-  SV* ctx;
   CV *unwind;
-  OP *new_op;
 
   PERL_UNUSED_VAR(user_data);
 
-  ENTER;
   PUSHMARK(SP);
-  XPUSHs(sv_2mortal(newSViv(2)));
+  XPUSHs(sv_2mortal(newSViv(3)));
   PUTBACK;
 
   call_pv("Scope::Upper::CALLER", G_SCALAR);
@@ -30,9 +27,7 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   XPUSHs( (SV*)unwind);
   PUTBACK;
 
-  CALL_FPTR(PL_ppaddr[OP_ENTERSUB])(aTHX);
-
-  return PL_op->op_next;
+  return CALL_FPTR(PL_ppaddr[OP_ENTERSUB])(aTHX);
 }
 
 STATIC OP* check_return (pTHX_ OP *op, void *user_data) {
