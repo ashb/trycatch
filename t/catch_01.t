@@ -30,6 +30,6 @@ sub simple_die {
   return "no error";
 }
 
-is(simple_no_die(), "simple_return");
+is(simple_no_die(), "simple_return", "simple_return");
 is(simple_die(), "We got a Str error of 'Some str'");
 

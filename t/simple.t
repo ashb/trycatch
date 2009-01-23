@@ -13,15 +13,14 @@ sub simple_return {
   return "bar";
 }
 
-#sub simple_no_return {
-#  try {
-#    "simple_return"; # Not a return op
-#  }
-#
-#  return "bar";
-#}
+sub simple_no_return {
+  try {
+    "simple_return"; # Not a return op
+  }
 
-#is(simple_return(), "simple_return");
-simple_return();
-#is(simple_no_return(), "bar");
+  return "bar";
+}
+
+is(simple_return(), "simple_return");
+is(simple_no_return(), "bar");
 
