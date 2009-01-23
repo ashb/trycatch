@@ -16,13 +16,19 @@ sub catch {
   #      (i.e. that catch is preceded by catch or try)
 
   local $TryCatch::Exception::MATCHED;
-  local $@ = $self->{error};
+  local $@;
 
-  my $ctx = SUB(CALLER(1));
-  my @ret = TryCatch::XS::_monitor_return($sub, want_at( $ctx ), 0);
-
-  # TODO: This will be wrong if i allow finally
-  unwind @ret => $ctx if pop @ret;
+  my $ctx = want_at SUB(CALLER(1));
+  eval {
+    $@ = $self->{error};
+    if ($ctx) {
+      my @ret = $sub->(); 
+    } elsif (defined $ctx) {
+      my $ret = $sub->();
+    } else {
+      $sub->();
+    }
+  };
  
   return "TryCatch::Exception::Handled" if $MATCHED;
   return $self;

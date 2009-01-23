@@ -8,7 +8,7 @@ use B::Hooks::OP::PPAddr;
 
 our $VERSION = '1.000000';
 our $PARSE_CATCH_NEXT = 0;
-our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH);
+our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH) = (undef, 0);
 
 sub dl_load_flags { 0x01 }
 
@@ -52,13 +52,16 @@ sub try {
 
   local $@;
   my $ctx = want_at SUB(CALLER(1));
-  if ($ctx) {
-    my @ret = $sub->(); 
-  } elsif (defined $ctx) {
-    my $ret = $sub->();
-  } else {
-    $sub->();
-  }
+  eval {
+    if ($ctx) {
+      my @ret = $sub->(); 
+    } elsif (defined $ctx) {
+      my $ret = $sub->();
+    } else {
+      $sub->();
+    }
+  };
+
 
   # If we get here there was either no explicit return or an error
 
@@ -98,11 +101,8 @@ sub _parse_try {
     substr($linestr, $ctx->offset,0) = q#(sub #;
     $ctx->set_linestr($linestr);
 
-    if (!$CHECK_OP_DEPTH) {
-      $CHECK_OP_DEPTH = 1;
+    if (! $CHECK_OP_DEPTH++) {
       $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
-    } else {
-      $CHECK_OP_DEPTH++;
     }
 
   }
@@ -134,6 +134,10 @@ sub try_postlude_block {
 
   my $ctx = Devel::Declare::Context::Simple->new->init($toke, $offset);
 
+  if (--$CHECK_OP_DEPTH == 0) {
+    TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
+  }
+
   if ($toke eq 'catch') {
 
     $ctx->skipspace;
@@ -148,9 +152,6 @@ sub try_postlude_block {
 
     $ctx->set_linestr($linestr);
 
-    if (--$CHECK_OP_DEPTH == 0) {
-      TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
-    }
   }
 }
 
@@ -169,6 +170,9 @@ sub catch_postlude_block {
 
   my $ctx = Devel::Declare::Context::Simple->new->init($toke, $offset);
 
+  if (--$CHECK_OP_DEPTH == 0) {
+    TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
+  }
   if ($toke eq 'catch') {
 
     $ctx->skipspace;
@@ -179,9 +183,6 @@ sub catch_postlude_block {
     substr($linestr, $offset, 0) = ");";
     Devel::Declare::set_linestr($linestr);
 
-    if (--$CHECK_OP_DEPTH == 0) {
-      TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
-    }
   }
 }
 
@@ -238,6 +239,10 @@ sub _parse_catch {
     q# BEGIN { TryCatch::catch_postlude() }# . $tc_code;
   substr($linestr, $ctx->offset,0) = q#(sub #;
   $ctx->set_linestr($linestr);
+
+  if (! $CHECK_OP_DEPTH++) {
+    $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
+  }
 }
 
 
