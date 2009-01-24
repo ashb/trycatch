@@ -10,7 +10,6 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   CV *unwind;
 
   PERL_UNUSED_VAR(user_data);
-
   PUSHMARK(SP);
   XPUSHs(sv_2mortal(newSViv(3)));
   PUTBACK;
@@ -30,55 +29,53 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   return CALL_FPTR(PL_ppaddr[OP_ENTERSUB])(aTHX);
 }
 
+// Hook the OP_RETURN iff we are in hte same file as originally compiling.
 STATIC OP* check_return (pTHX_ OP *op, void *user_data) {
-  PERL_UNUSED_VAR(user_data);
-
+  
+  const char* file = SvPV_nolen( (SV*)user_data );
+  const char* cur_file = CopFILE(&PL_compiling);
+  if (strcmp(file, cur_file))
+    return op;
   hook_op_ppaddr(op, unwind_return, NULL);
   return op;
 }
 
 MODULE = TryCatch PACKAGE = TryCatch::XS
 
-void
-call_in_context(code, array_ctx, eval)
-SV* code;
-SV* array_ctx; // Desired wantarray context;
-SV*  eval;
-  PROTOTYPE: DISABLE
-  PPCODE:
-    int ret, ctx;
-
-    ctx =  SvTRUE(array_ctx) ? G_ARRAY :
-           array_ctx != &PL_sv_undef ? G_SCALAR: G_VOID;
-    if (SvTRUE(eval))
-      ctx |= G_EVAL;
-
-    ret = call_sv(code, ctx);
-  
-    SPAGAIN;
-
-    if ( (ctx & G_EVAL) && SvTRUE(ERRSV)) {
-      while (ret) {
-        POPs;
-        ret--;
-      }
-      XPUSHs(&PL_sv_no);
-      XSRETURN(1);
-    }
-
-    XPUSHs(&PL_sv_no);
-    XSRETURN(1+ret);
-
-UV 
+void 
 install_return_op_check()
   CODE:
-    RETVAL = hook_op_check( OP_RETURN, check_return, NULL);
-  OUTPUT:
-    RETVAL
+    // Code stole from Scalar::Util::dualvar
+    UV id;
+    char* file = CopFILE(&PL_compiling);
+    STRLEN len = strlen(file);
+
+    ST(0) = newSV(0);
+
+    (void)SvUPGRADE(ST(0),SVt_PVNV);
+    sv_setpvn(ST(0),file,len);
+
+    id = hook_op_check( OP_RETURN, check_return, ST(0) );
+#ifdef SVf_IVisUV
+    SvUV_set(ST(0), id);
+    SvIOK_on(ST(0));
+    SvIsUV_on(ST(0));
+#else
+    SvIV_set(ST(0), id);
+    SvIOK_on(ST(0));
+#endif
+
+    XSRETURN(1);
 
 void
 uninstall_return_op_check(id)
-UV id
+SV* id
   CODE:
-    hook_op_check_remove(OP_RETURN, id);
+#ifdef SVf_IVisUV
+    UV uiv = SvUV(id);
+#else
+    UV uiv = SvIV(id);
+#endif
+    hook_op_check_remove(OP_RETURN, uiv);
+    //SvREFCNT_dec( id );
   OUTPUT:
