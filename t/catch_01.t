@@ -19,17 +19,36 @@ sub simple_no_die {
 
 
 sub simple_die {
+  my $msg = "no error";
   try {
     die "Some str\n";
   }
-  catch (Str $err) {
+  catch (Str $err where { length $_ < 5 }) {
     chomp($err);
-    return "We got a Str error of '$err'";
+    $msg = "We got a short Str error of '$err'";
+  }
+  catch (Str $err where { length $_ >= 5 }) {
+    chomp($err);
+    $msg = "We got a long Str error of '$err'";
   }
 
-  return "no error";
+  return $msg;
 }
 
+=for comment
+sub simple_catch_type {
+  try {
+    die [1,2,3];
+  }
+  catch (ArrayRef[Int] $array) {
+    return "Got an array of @$array";
+  }
+  catch ($e) {
+    return "Got otherwise";
+  }
+}
+=cut
+
 is(simple_no_die(), "simple_return", "simple_return");
-is(simple_die(), "We got a Str error of 'Some str'");
+is(simple_die(), "We got a long Str error of 'Some str'");
 

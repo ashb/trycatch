@@ -6,17 +6,25 @@ use warnings;
 use Scope::Upper qw/unwind want_at :words/;
 use namespace::clean;
 
-use vars qw/$MATCHED/;
-
 sub catch {
-  my ($self, $sub) = @_;
-  return unless ref $sub && ref $sub eq 'CODE';
+  my ($self, @conds) = @_;
+  my $sub = pop @conds;
+  die "no code to catch!" unless ref $sub && ref $sub eq 'CODE';
   
-  #TODO: Check $self, better yet work out how to do the check at compile time
-  #      (i.e. that catch is preceded by catch or try)
-
-  local $TryCatch::Exception::MATCHED;
   local $@;
+  for my $cond (@conds) {
+    if (ref $cond) {
+      local *_ = \$self->{error};
+      return $self unless $cond->();
+    }
+    else {
+      my $tc = TryCatch->get_tc($cond);
+      return $self unless $tc->check($self->{error});
+    }
+        
+  }
+
+  # If we get here then the conditions match
 
   my $ctx = want_at SUB(CALLER(1));
   eval {
@@ -29,9 +37,8 @@ sub catch {
       $sub->();
     }
   };
- 
-  return "TryCatch::Exception::Handled" if $MATCHED;
-  return $self;
+
+  return "TryCatch::Exception::Handled";
 }
 
 package TryCatch::Exception::Handled;

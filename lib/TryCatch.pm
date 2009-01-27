@@ -4,7 +4,6 @@ use strict;
 use warnings;
 
 use base 'DynaLoader';
-use B::Hooks::OP::PPAddr;
 
 our $VERSION = '1.000000';
 our $PARSE_CATCH_NEXT = 0;
@@ -38,11 +37,13 @@ use Sub::Exporter -setup => {
 
 use Devel::Declare ();
 use B::Hooks::EndOfScope;
+use B::Hooks::OP::PPAddr;
 use Devel::Declare::Context::Simple;
 use Parse::Method::Signatures;
 use Moose::Util::TypeConstraints;
 use Scope::Upper qw/unwind want_at :words/;
 use TryCatch::Exception;
+use TryCatch::TypeParser;
 use Carp qw/croak/;
 
 
@@ -67,6 +68,16 @@ sub try {
 
   return "TryCatch::Exception::Handled" unless defined($@);
   return bless { error => $@ }, "TryCatch::Exception";
+}
+
+# Where we store all the TCs for catch blocks created at compile time
+# Not sure we really want to do this, but we will for now.
+our $TC_LIBRARY = {};
+
+sub get_tc {
+  my ($class, $tc) = @_;
+
+  $TC_LIBRARY->{$tc} or die "Unable to find parse TC for '$tc'";
 }
 
 # From here on out its parsing methods.
@@ -115,6 +126,10 @@ sub try_postlude {
 
 sub catch_postlude {
   on_scope_end { catch_postlude_block() }
+}
+
+sub close_block {
+  on_scope_end { block_closer() }
 }
 
 # stick ')->' or ');' on after the '}' as needed
@@ -186,6 +201,13 @@ sub catch_postlude_block {
   }
 }
 
+sub block_closer {
+  my $offset = Devel::Declare::get_linestr_offset();
+  my $linestr = Devel::Declare::get_linestr();
+  substr($linestr,$offset, 0, "}");
+  Devel::Declare::set_linestr($linestr);
+}
+
 # turn 'catch() {' into '->catch({ TC_check_code;'
 # the '->' is added by one of the postlude hooks
 sub _parse_catch {
@@ -212,13 +234,31 @@ sub _parse_catch {
   $ctx->inc_offset($len);
   $ctx->skipspace;
 
-  my $tc_code = "";
+  my $var_code = "";
+  my @conditions;
   # optional ()
   if (substr($linestr, $ctx->offset, 1) eq '(') {
     my $substr = substr($linestr, $ctx->offset+1);
     my ($param, $left) = Parse::Method::Signatures->param($substr);
- 
-    $tc_code .= 'my ' . $param->variable_name . ' = $@;';
+
+    die "can't handle un-named vars yet" unless $param->can('variable_name');
+
+    my $name = $param->variable_name;
+    $var_code .= "my $name= \$@;";
+
+    if ($param->has_type_constraints) {
+      my $parser = TryCatch::TypeParser->new(package => $pack);
+      my $tc = $parser->visit($param->type_constraints->data);
+      $TC_LIBRARY->{"$tc"} = $tc;
+      push @conditions, "'$tc'";
+    }
+
+    if ($param->has_constraints) {
+      foreach my $con (@{$param->constraints}) {
+        # This is far less than optimal;
+        push @conditions, "sub $con";
+      }
+    }
 
     substr($linestr, $ctx->offset, length($linestr) - $ctx->offset - length($left), '');
     $ctx->set_linestr($linestr);
@@ -236,8 +276,9 @@ sub _parse_catch {
     unless substr($linestr, $ctx->offset, 1) eq '{';
 
   substr($linestr, $ctx->offset+1,0) = 
-    q# BEGIN { TryCatch::catch_postlude() }# . $tc_code;
-  substr($linestr, $ctx->offset,0) = q#(sub #;
+    q# BEGIN { TryCatch::catch_postlude() }# . $var_code;
+  push @conditions, "sub ";
+  substr($linestr, $ctx->offset,0) = '(' . join(', ', @conditions);
   $ctx->set_linestr($linestr);
 
   if (! $CHECK_OP_DEPTH++) {
