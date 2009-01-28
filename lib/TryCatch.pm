@@ -172,18 +172,20 @@ sub try_postlude_block {
 
 sub catch_postlude_block {
 
-  my $linestr = Devel::Declare::get_linestr();
-  my $offset = Devel::Declare::get_linestr_offset();
+  my $ctx = Devel::Declare::Context::Simple->new->init(
+    '', 
+    Devel::Declare::get_linestr_offset()
+  );
+
+  my $offset = $ctx->skipspace;
+  my $linestr = $ctx->get_linestr;
 
   my $toke = '';
   my $len = 0;
+
   if ($len = Devel::Declare::toke_scan_word($offset, 1 )) {
     $toke = substr( $linestr, $offset, $len );
   }
-
-  $offset = Devel::Declare::get_linestr_offset();
-
-  my $ctx = Devel::Declare::Context::Simple->new->init($toke, $offset);
 
   if (--$CHECK_OP_DEPTH == 0) {
     TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
@@ -196,8 +198,7 @@ sub catch_postlude_block {
     $TryCatch::PARSE_CATCH_NEXT = 1;
   } else {
     substr($linestr, $offset, 0) = ");";
-    Devel::Declare::set_linestr($linestr);
-
+    $ctx->set_linestr($linestr);
   }
 }
 

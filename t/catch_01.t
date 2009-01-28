@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 3;
+use Test::More tests => 4;
 
 BEGIN { use_ok "TryCatch" or BAIL_OUT("Cannot load TryCatch") };
 #use TryCatch;
@@ -35,7 +35,6 @@ sub simple_die {
   return $msg;
 }
 
-=for comment
 sub simple_catch_type {
   try {
     die [1,2,3];
@@ -47,8 +46,8 @@ sub simple_catch_type {
     return "Got otherwise";
   }
 }
-=cut
 
 is(simple_no_die(), "simple_return", "simple_return");
-is(simple_die(), "We got a long Str error of 'Some str'");
+is(simple_die(), "We got a long Str error of 'Some str'", "simple_die");
+is(simple_catch_type(), "Got an array of 1 2 3", "simple_catch_type");
 
