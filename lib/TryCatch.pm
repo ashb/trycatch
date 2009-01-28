@@ -121,56 +121,19 @@ sub _parse_try {
 }
 
 sub try_postlude {
-  on_scope_end { try_postlude_block() }
+  on_scope_end { block_postlude() }
 }
 
 sub catch_postlude {
-  on_scope_end { catch_postlude_block() }
+  on_scope_end { block_postlude() }
 }
 
 sub close_block {
   on_scope_end { block_closer() }
 }
 
-# stick ')->' or ');' on after the '}' as needed
-sub try_postlude_block {
-
-  my $offset = Devel::Declare::get_linestr_offset();
-  $offset += Devel::Declare::toke_skipspace($offset);
-  my $linestr = Devel::Declare::get_linestr();
-
-  my $toke = '';
-  my $len = 0;
-  if ($len = Devel::Declare::toke_scan_word($offset, 1 )) {
-    $toke = substr( $linestr, $offset, $len );
-  }
-
-  $offset = Devel::Declare::get_linestr_offset();
-
-  my $ctx = Devel::Declare::Context::Simple->new->init($toke, $offset);
-
-  if (--$CHECK_OP_DEPTH == 0) {
-    TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
-  }
-
-  if ($toke eq 'catch') {
-
-    $ctx->skipspace;
-    substr($linestr, $ctx->offset, 0) = ')->';
-    $ctx->set_linestr($linestr);
-    $TryCatch::PARSE_CATCH_NEXT = 1;
-
-  #} elsif ($toke eq 'finally') {
-  } else {
-    my $str = ',"empty");';
-    substr( $linestr, $offset, 0 ) = $str;
-
-    $ctx->set_linestr($linestr);
-
-  }
-}
-
-sub catch_postlude_block {
+# Called after the block from try {} or catch {}
+sub block_postlude {
 
   my $ctx = Devel::Declare::Context::Simple->new->init(
     '', 
