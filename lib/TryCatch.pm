@@ -49,25 +49,10 @@ use Carp qw/croak/;
 
 # The actual try call itself. Nothing to do with parsing.
 sub try {
-  my ($sub, $terminal) = @_;
+  my ($sub) = @_;
 
-  local $@;
-  my $ctx = want_at SUB(CALLER(1));
-  eval {
-    if ($ctx) {
-      my @ret = $sub->(); 
-    } elsif (defined $ctx) {
-      my $ret = $sub->();
-    } else {
-      $sub->();
-    }
-  };
+  return new TryCatch::Exception( try => $sub, ctx => SUB(CALLER(1)) );
 
-
-  # If we get here there was either no explicit return or an error
-
-  return "TryCatch::Exception::Handled" unless defined($@);
-  return bless { error => $@ }, "TryCatch::Exception";
 }
 
 # Where we store all the TCs for catch blocks created at compile time
@@ -160,7 +145,7 @@ sub block_postlude {
     $ctx->set_linestr($linestr);
     $TryCatch::PARSE_CATCH_NEXT = 1;
   } else {
-    substr($linestr, $offset, 0) = ");";
+    substr($linestr, $offset, 0) = ")->run;";
     $ctx->set_linestr($linestr);
   }
 }

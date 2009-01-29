@@ -7,16 +7,24 @@
 
 STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   dSP;
+  SV* ctx;
   CV *unwind;
 
   PERL_UNUSED_VAR(user_data);
-  PUSHMARK(SP);
-  XPUSHs(sv_2mortal(newSViv(3)));
-  PUTBACK;
 
-  call_pv("Scope::Upper::CALLER", G_SCALAR);
+  ctx = get_sv("TryCatch::Exception::CTX", 0);
+  if (ctx) {
+    XPUSHs(ctx);
+    PUTBACK;
+  } else {
+    PUSHMARK(SP);
+    XPUSHs(sv_2mortal(newSViv(3)));
+    PUTBACK;
 
-  SPAGAIN;
+    call_pv("Scope::Upper::CALLER", G_SCALAR);
+
+    SPAGAIN;
+  }
 
 
   // call_pv("Scope::Upper::unwind", G_VOID);

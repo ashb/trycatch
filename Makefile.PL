@@ -16,6 +16,7 @@ requires 'B::Hooks::OP::Check' => 0.15;
 requires 'B::Hooks::OP::PPAddr' => 0.02;
 requires 'Devel::Declare';
 requires 'Moose';
+requires 'MooseX::Types::Moose';
 requires 'Scope::Upper' => 0.06;
 
 resources repository => 'http://github.com/ashb/trycatch/tree/master';

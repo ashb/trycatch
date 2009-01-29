@@ -1,48 +1,89 @@
 package TryCatch::Exception;
 
-use strict;
-use warnings;
+use Moose;
+
+use MooseX::Types::Moose qw/CodeRef ArrayRef/;
 
 use Scope::Upper qw/unwind want_at :words/;
-use namespace::clean;
+use namespace::clean -except => 'meta';
+
+has try => (
+  is => 'ro',
+  isa => CodeRef,
+  required => 1
+);
+
+has catches => (
+  is => 'ro',
+  isa => ArrayRef[ArrayRef[CodeRef]],
+  default => sub { [] }
+);
+
+has ctx => (
+  is => 'ro',
+  required => 1
+);
+
+our $CTX;
+
+sub _run_block {
+  my ($self, $code) = @_;
+
+  my $wa = want_at $CTX;
+  if ($wa) {
+    my @ret = $code->(); 
+  } elsif (defined $wa) {
+    my $ret = $code->();
+  } else {
+    $code->();
+  }
+}
+
+sub run {
+  my ($self) = @_;
+  local $CTX = $CTX;
+  my $ctx = $CTX;
+
+  unless (defined $CTX) {
+    $CTX = $ctx = $self->ctx;
+  }
+
+  local $@;
+  eval {
+    $self->_run_block($self->try);
+  };
+
+  # If we get here there was either no explicit return or an error
+  return unless defined($@);
+  my $err = $@;
+
+  CATCH: for my $catch ( @{$self->catches} ) {
+    my $sub = pop @$catch;
+    for my $cond (@$catch) {
+      if (ref $cond) {
+        local *_ = \$err;
+        next CATCH unless $cond->();
+      }
+      else {
+        my $tc = TryCatch->get_tc($cond);
+        next CATCH unless $tc->check($err);
+      }
+          
+    }
+
+    $self->_run_block($sub);
+  }
+
+  return;
+}
 
 sub catch {
   my ($self, @conds) = @_;
-  my $sub = pop @conds;
-  die "no code to catch!" unless ref $sub && ref $sub eq 'CODE';
-  
-  local $@;
-  for my $cond (@conds) {
-    if (ref $cond) {
-      local *_ = \$self->{error};
-      return $self unless $cond->();
-    }
-    else {
-      my $tc = TryCatch->get_tc($cond);
-      return $self unless $tc->check($self->{error});
-    }
-        
-  }
+  push @{$self->catches}, [@conds];
+  return $self;
 
-  # If we get here then the conditions match
-
-  my $ctx = want_at SUB(CALLER(1));
-  eval {
-    $@ = $self->{error};
-    if ($ctx) {
-      my @ret = $sub->(); 
-    } elsif (defined $ctx) {
-      my $ret = $sub->();
-    } else {
-      $sub->();
-    }
-  };
-
-  return "TryCatch::Exception::Handled";
 }
 
-package TryCatch::Exception::Handled;
-
-sub catch {}
+__PACKAGE__->meta->make_immutable;
 
 1;
