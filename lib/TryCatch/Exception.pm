@@ -42,10 +42,13 @@ sub _run_block {
 sub run {
   my ($self) = @_;
   local $CTX = $CTX;
-  my $ctx = $CTX;
 
-  unless (defined $CTX) {
-    $CTX = $ctx = $self->ctx;
+  my ($package) = caller(1);
+  if ($package eq __PACKAGE__) {
+    # nested: try { try {} }
+    die "Internal Error: Nested try without CTX" unless defined $CTX;
+  } else {
+    $CTX = $self->ctx;
   }
 
   local $@;
