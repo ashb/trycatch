@@ -244,10 +244,74 @@ __END__
 
 TryCatch - first class try catch semantics for Perl, with no source filters.
 
+=head1 SYNOPSIS
+
+ use TryCatch
+
+ sub foo {
+   try {
+     # some code that might die
+     return "return value from foo";
+   }
+   catch (Some::Class $e where { $_->code > 100 } ) {
+   }
+ }
+
+=head1 SYNTAX
+
+This module aims to give first class exception handling to perl via 'try' and
+'catch' keywords. The basic syntax this module provides is C<try { # block }>
+followed by zero or more catch blocks. Each catch block has an optional type
+constraint on it the resembles Perl6's method signatures. 
+
+Also worth noting is that the error variable (C<$@>) is localised to the
+try/catch blocks and will not leak outside the scope, or stomp on a previous
+value of C<$@>.
+
+The simplest case of a catch block is just
+
+ catch { ... }
+
+where upon the error is available in the standard C<$@> variable and no type
+checking is performed. The exception can instead be accessed via a named
+lexical variable by providing a simple signature to the catch block as follows:
+
+ catch ($err) { ... }
+
+Type checking of the exception can be performed by specifing a type constraint
+or where clauses in the signature as follows:
+
+ catch (TypeFoo $e) { ... }
+ catch (Dict[code => Int, message => Str] $err) { ... }
+
+As shown in the above example, complex Mooose types can be used, including
+L<MooseX::Types::Structured> if it is imported into the compilation unit.
+
+In the case where multiple catch blocks are present, the first one that matches
+the type constraints (if any) will executed.
+
+=head1 TODO
+
+=over
+
+=item *
+
+Decide on C<finally> semantics w.r.t return values.
+
+=back
+
 =head1 AUTHOR
 
 Ash Berlin <ash@cpan.org>
 
+=head1 THANKS
+
+Thanks to Matt Trout and Florian Ragwitz for work on L<Devel::Declare> and
+various B::Hooks modules
+
+Vincent Pit for L<Scope::Upper> that makes the return from block possible.
+
 =head1 LICENSE
 
 Licensed under the same terms as Perl itself.
+
