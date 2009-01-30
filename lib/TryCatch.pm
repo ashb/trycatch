@@ -246,7 +246,7 @@ TryCatch - first class try catch semantics for Perl, with no source filters.
 
 =head1 SYNOPSIS
 
- use TryCatch
+ use TryCatch;
 
  sub foo {
    try {
