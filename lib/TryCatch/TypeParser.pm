@@ -44,13 +44,15 @@ sub visit {
 
   unless (ref $tc) {
     return $self->str_tc($tc);
-  } elsif ($tc->{-or}) {
+  } elsif (exists $tc->{-or}) {
     return $self->union_tc( $tc->{-or} );
-  } elsif ( $tc->{-type} ) {
+  } elsif ( exists $tc->{-type} ) {
     return $self->param_tc( $tc->{-type}, $tc->{-params} );
+  } elsif ( exists $tc->{-str} ) {
+    return $tc->{-str};
   } else {
     local $Data::Dumper::Indent = 1;
-    croak "Cannot deal with tc struct: \n" . Dumper($tc);
+    croak "TryCatch Internal Error: Cannot deal with tc struct: \n" . Dumper($tc);
   }
 }
 

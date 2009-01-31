@@ -27,20 +27,22 @@ has ctx => (
 our $CTX;
 
 sub _run_block {
-  my ($self, $code) = @_;
+  my ($self, $code, @args) = @_;
 
+  my @ret;
   my $wa = want_at $CTX;
   if ($wa) {
-    my @ret = $code->(); 
+    @ret = $code->(@args); 
   } elsif (defined $wa) {
-    my $ret = $code->();
+    $ret[0] = $code->(@args);
   } else {
     $code->();
   }
+  return @ret;
 }
 
 sub run {
-  my ($self) = @_;
+  my ($self, @args) = @_;
   local $CTX = $CTX;
 
   my ($package) = caller(1);
@@ -53,7 +55,7 @@ sub run {
 
   local $@;
   eval {
-    $self->_run_block($self->try);
+    $self->_run_block($self->try, @args);
   };
 
   # If we get here there was either no explicit return or an error
@@ -64,17 +66,20 @@ sub run {
     my $sub = pop @$catch;
     for my $cond (@$catch) {
       if (ref $cond) {
-        local *_ = \$err;
+        local $_ = $err;
         next CATCH unless $cond->();
       }
       else {
+        $DB::single = 1;
         my $tc = TryCatch->get_tc($cond);
         next CATCH unless $tc->check($err);
       }
           
     }
 
-    $self->_run_block($sub);
+    my @return = $self->_run_block($sub, @args);
+    warn "catch returned '@return'\n";
+    last CATCH;
   }
 
   return;

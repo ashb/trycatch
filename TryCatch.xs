@@ -5,6 +5,30 @@
 #include "hook_op_check.h"
 #include "hook_op_ppaddr.h"
 
+static int trycatch_debug = 0;
+
+STATIC I32
+dump_cxstack()
+{
+  //dVAR;
+  SV* sv;
+  I32 i;
+  for (i = cxstack_ix; i >= 0; i--) {
+    register const PERL_CONTEXT * const cx = cxstack+i;
+    switch (CxTYPE(cx)) {
+    default:
+        continue;
+    case CXt_EVAL:
+    case CXt_FORMAT:
+    case CXt_SUB:
+        printf("***\n* cx stack %d\n", i);
+        sv_dump(cx->blk_sub.cv); 
+    }
+  }
+  return i;
+}
+
+
 STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   dSP;
   SV* ctx;
@@ -16,14 +40,20 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   if (ctx) {
     XPUSHs(ctx);
     PUTBACK;
+    SPAGAIN;
   } else {
     PUSHMARK(SP);
-    XPUSHs(sv_2mortal(newSViv(3)));
+    XPUSHs(sv_2mortal(newSViv(4)));
     PUTBACK;
 
     call_pv("Scope::Upper::CALLER", G_SCALAR);
 
     SPAGAIN;
+  }
+
+  if (trycatch_debug) {
+    dump_cxstack();
+    printf("unwinding to %d\n", SvIV(*sp));
   }
 
 
@@ -87,3 +117,9 @@ SV* id
     hook_op_check_remove(OP_RETURN, uiv);
     //SvREFCNT_dec( id );
   OUTPUT:
+
+BOOT:
+  if (getenv ("TRYCATCH_DEBUG")) {
+    trycatch_debug = 1;
+  }
+
