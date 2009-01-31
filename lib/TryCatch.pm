@@ -3,7 +3,20 @@ package TryCatch;
 use strict;
 use warnings;
 
+
+use Devel::Declare ();
+use B::Hooks::EndOfScope;
+use B::Hooks::OP::PPAddr;
+use Devel::Declare::Context::Simple;
+use Parse::Method::Signatures;
+use Moose::Util::TypeConstraints;
+use Scope::Upper qw/unwind want_at :words/;
+use TryCatch::Exception;
+use TryCatch::TypeParser;
+use Carp qw/croak/;
+
 use base 'DynaLoader';
+
 
 our $VERSION = '1.000000';
 our $PARSE_CATCH_NEXT = 0;
@@ -12,6 +25,8 @@ our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH) = (undef, 0);
 sub dl_load_flags { 0x01 }
 
 __PACKAGE__->bootstrap($VERSION);
+
+use namespace::clean;
 
 use Sub::Exporter -setup => {
   exports => [qw/try/],
@@ -34,17 +49,6 @@ use Sub::Exporter -setup => {
 
   }
 };
-
-use Devel::Declare ();
-use B::Hooks::EndOfScope;
-use B::Hooks::OP::PPAddr;
-use Devel::Declare::Context::Simple;
-use Parse::Method::Signatures;
-use Moose::Util::TypeConstraints;
-use Scope::Upper qw/unwind want_at :words/;
-use TryCatch::Exception;
-use TryCatch::TypeParser;
-use Carp qw/croak/;
 
 
 # The actual try call itself. Nothing to do with parsing.
@@ -93,7 +97,7 @@ sub _parse_try {
     croak "block required after try"
       unless substr($linestr, $ctx->offset, 1) eq '{';
 
-    substr($linestr, $ctx->offset+1,0) = q# BEGIN { TryCatch::try_postlude() }#;
+    substr($linestr, $ctx->offset+1,0) = q# BEGIN { TryCatch::postlude() }#;
     substr($linestr, $ctx->offset,0) = q#(sub #;
     $ctx->set_linestr($linestr);
 
@@ -105,16 +109,8 @@ sub _parse_try {
   
 }
 
-sub try_postlude {
+sub postlude {
   on_scope_end { block_postlude() }
-}
-
-sub catch_postlude {
-  on_scope_end { block_postlude() }
-}
-
-sub close_block {
-  on_scope_end { block_closer() }
 }
 
 # Called after the block from try {} or catch {}
@@ -145,17 +141,11 @@ sub block_postlude {
     $ctx->set_linestr($linestr);
     $TryCatch::PARSE_CATCH_NEXT = 1;
   } else {
-    substr($linestr, $offset, 0) = ")->run;";
+    substr($linestr, $offset, 0) = ')->run(@_);';
     $ctx->set_linestr($linestr);
   }
 }
 
-sub block_closer {
-  my $offset = Devel::Declare::get_linestr_offset();
-  my $linestr = Devel::Declare::get_linestr();
-  substr($linestr,$offset, 0, "}");
-  Devel::Declare::set_linestr($linestr);
-}
 
 # turn 'catch() {' into '->catch({ TC_check_code;'
 # the '->' is added by one of the postlude hooks
@@ -193,8 +183,9 @@ sub _parse_catch {
     die "can't handle un-named vars yet" unless $param->can('variable_name');
 
     my $name = $param->variable_name;
-    $var_code .= "my $name= \$@;";
+    $var_code .= "my $name = \$@;";
 
+    # (TC $var)
     if ($param->has_type_constraints) {
       my $parser = TryCatch::TypeParser->new(package => $pack);
       my $tc = $parser->visit($param->type_constraints->data);
@@ -202,9 +193,9 @@ sub _parse_catch {
       push @conditions, "'$tc'";
     }
 
+    # ($var where { $_ } )
     if ($param->has_constraints) {
       foreach my $con (@{$param->constraints}) {
-        # This is far less than optimal;
         push @conditions, "sub $con";
       }
     }
@@ -225,7 +216,7 @@ sub _parse_catch {
     unless substr($linestr, $ctx->offset, 1) eq '{';
 
   substr($linestr, $ctx->offset+1,0) = 
-    q# BEGIN { TryCatch::catch_postlude() }# . $var_code;
+    q# BEGIN { TryCatch::postlude() }# . $var_code;
   push @conditions, "sub ";
   substr($linestr, $ctx->offset,0) = '(' . join(', ', @conditions);
   $ctx->set_linestr($linestr);
@@ -242,7 +233,7 @@ __END__
 
 =head1 NAME
 
-TryCatch - first class try catch semantics for Perl, with no source filters.
+TryCatch - first class try catch semantics for Perl, without source filters.
 
 =head1 SYNOPSIS
 
@@ -284,11 +275,34 @@ or where clauses in the signature as follows:
  catch (TypeFoo $e) { ... }
  catch (Dict[code => Int, message => Str] $err) { ... }
 
-As shown in the above example, complex Mooose types can be used, including
-L<MooseX::Types::Structured> if it is imported into the compilation unit.
+As shown in the above example, complex Moose types can be used, including
+L<MooseX::Types> style of type constraints
+
+In addition to type checking via Moose type constraints, you can also use where
+clauses to only match a certain sub-condition on an error. For example,
+assuming that C<HTTPError> is a suitably defined TC:
+
+ catch (HTTPError $e where { $_->code >= 400 && $_->code <= 499 } ) { 
+   return "4XX error";
+ }
+ catch (HTTPError $e) {
+   return "other http code";
+ }
+
+would return "4XX error" in the case of a 404 error, and "other http code" in
+the case of a 302.
 
 In the case where multiple catch blocks are present, the first one that matches
 the type constraints (if any) will executed.
+
+=head1 BENEFITS
+
+B<return>. You can put a return in a try block, and it would do the right thing
+- namely return a value from the sub routinte you are in, instead of just from
+the eval block. 
+
+B<Type Checking>. This is nothing you couldn't do manually yourself, it does it
+for you using Moose type constraints.
 
 =head1 TODO
 
@@ -298,7 +312,15 @@ the type constraints (if any) will executed.
 
 Decide on C<finally> semantics w.r.t return values.
 
+=item *
+
+Write some more documentation
+
 =back
+
+=head1 SEE ALSO
+
+L<MooseX::Types>, L<Moose::Util::TypeConstraints>, L<Parse::Method::Signatures>.
 
 =head1 AUTHOR
 
@@ -306,7 +328,7 @@ Ash Berlin <ash@cpan.org>
 
 =head1 THANKS
 
-Thanks to Matt Trout and Florian Ragwitz for work on L<Devel::Declare> and
+Thanks to Matt S Trout and Florian Ragwitz for work on L<Devel::Declare> and
 various B::Hooks modules
 
 Vincent Pit for L<Scope::Upper> that makes the return from block possible.
