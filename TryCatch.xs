@@ -22,7 +22,7 @@ dump_cxstack()
     case CXt_FORMAT:
     case CXt_SUB:
         printf("***\n* cx stack %d\n", i);
-        sv_dump(cx->blk_sub.cv); 
+        sv_dump((SV*)cx->blk_sub.cv); 
     }
   }
   return i;
@@ -40,7 +40,6 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   if (ctx) {
     XPUSHs(ctx);
     PUTBACK;
-    SPAGAIN;
   } else {
     PUSHMARK(SP);
     XPUSHs(sv_2mortal(newSViv(4)));
@@ -54,6 +53,7 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   if (trycatch_debug) {
     dump_cxstack();
     printf("unwinding to %d\n", SvIV(*sp));
+
   }
 
 

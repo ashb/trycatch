@@ -318,6 +318,22 @@ Write some more documentation
 
 =back
 
+=head1 KNOWN BUGS
+
+Currently C<@_> is not accessible inside try or catch blocks, so assign this to
+a lexical variable outside if you wish to access function arguments. i.e.: 
+
+ sub foo {
+   try { return $_[0] };
+ }
+
+will not work, instead you must do something similar to this:
+
+ sub foo {
+   my ($foo) = @_;
+   try { return $foo }
+ }
+
 =head1 SEE ALSO
 
 L<MooseX::Types>, L<Moose::Util::TypeConstraints>, L<Parse::Method::Signatures>.

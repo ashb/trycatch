@@ -27,14 +27,14 @@ has ctx => (
 our $CTX;
 
 sub _run_block {
-  my ($self, $code, @args) = @_;
+  my ($self, $code) = (shift,shift);
 
   my @ret;
   my $wa = want_at $CTX;
   if ($wa) {
-    @ret = $code->(@args); 
+    @ret = $code->(); 
   } elsif (defined $wa) {
-    $ret[0] = $code->(@args);
+    $ret[0] = $code->();
   } else {
     $code->();
   }
@@ -70,16 +70,13 @@ sub run {
         next CATCH unless $cond->();
       }
       else {
-        $DB::single = 1;
         my $tc = TryCatch->get_tc($cond);
         next CATCH unless $tc->check($err);
       }
           
     }
-
-    my @return = $self->_run_block($sub, @args);
-    warn "catch returned '@return'\n";
-    last CATCH;
+    $self->_run_block($sub, @args);
+    last;
   }
 
   return;
