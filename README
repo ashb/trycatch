@@ -1,0 +1,108 @@
+NAME
+    TryCatch - first class try catch semantics for Perl, without source
+    filters.
+
+SYNOPSIS
+     use TryCatch;
+
+     sub foo {
+       try {
+         # some code that might die
+         return "return value from foo";
+       }
+       catch (Some::Class $e where { $_->code > 100 } ) {
+       }
+     }
+
+SYNTAX
+    This module aims to give first class exception handling to perl via
+    'try' and 'catch' keywords. The basic syntax this module provides is
+    "try { # block }" followed by zero or more catch blocks. Each catch
+    block has an optional type constraint on it the resembles Perl6's method
+    signatures.
+
+    Also worth noting is that the error variable ($@) is localised to the
+    try/catch blocks and will not leak outside the scope, or stomp on a
+    previous value of $@.
+
+    The simplest case of a catch block is just
+
+     catch { ... }
+
+    where upon the error is available in the standard $@ variable and no
+    type checking is performed. The exception can instead be accessed via a
+    named lexical variable by providing a simple signature to the catch
+    block as follows:
+
+     catch ($err) { ... }
+
+    Type checking of the exception can be performed by specifing a type
+    constraint or where clauses in the signature as follows:
+
+     catch (TypeFoo $e) { ... }
+     catch (Dict[code => Int, message => Str] $err) { ... }
+
+    As shown in the above example, complex Moose types can be used,
+    including MooseX::Types style of type constraints
+
+    In addition to type checking via Moose type constraints, you can also
+    use where clauses to only match a certain sub-condition on an error. For
+    example, assuming that "HTTPError" is a suitably defined TC:
+
+     catch (HTTPError $e where { $_->code >= 400 && $_->code <= 499 } ) { 
+       return "4XX error";
+     }
+     catch (HTTPError $e) {
+       return "other http code";
+     }
+
+    would return "4XX error" in the case of a 404 error, and "other http
+    code" in the case of a 302.
+
+    In the case where multiple catch blocks are present, the first one that
+    matches the type constraints (if any) will executed.
+
+BENEFITS
+    return. You can put a return in a try block, and it would do the right
+    thing - namely return a value from the sub routinte you are in, instead
+    of just from the eval block.
+
+    Type Checking. This is nothing you couldn't do manually yourself, it
+    does it for you using Moose type constraints.
+
+TODO
+    *   Decide on "finally" semantics w.r.t return values.
+
+    *   Write some more documentation
+
+KNOWN BUGS
+    Currently @_ is not accessible inside try or catch blocks, so assign
+    this to a lexical variable outside if you wish to access function
+    arguments. i.e.:
+
+     sub foo {
+       try { return $_[0] };
+     }
+
+    will not work, instead you must do something similar to this:
+
+     sub foo {
+       my ($foo) = @_;
+       try { return $foo }
+     }
+
+SEE ALSO
+    MooseX::Types, Moose::Util::TypeConstraints, Parse::Method::Signatures.
+
+AUTHOR
+    Ash Berlin <ash@cpan.org>
+
+THANKS
+    Thanks to Matt S Trout and Florian Ragwitz for work on Devel::Declare
+    and various B::Hooks modules
+
+    Vincent Pit for Scope::Upper that makes the return from block possible.
+
+LICENSE
+    Licensed under the same terms as Perl itself.
+
