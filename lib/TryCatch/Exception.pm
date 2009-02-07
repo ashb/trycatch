@@ -1,6 +1,7 @@
 package TryCatch::Exception;
 
 use Moose;
+use TryCatch qw//;
 
 use MooseX::Types::Moose qw/CodeRef ArrayRef/;
 
@@ -53,6 +54,7 @@ sub run {
     $CTX = $self->ctx;
   }
 
+  my $wa = want_at $CTX;
   local $@;
   eval {
     $self->_run_block($self->try, @args);
@@ -66,7 +68,8 @@ sub run {
     my $sub = pop @$catch;
     for my $cond (@$catch) {
       if (ref $cond) {
-        local $_ = $err;
+        local *_;
+        $_ = $err;
         next CATCH unless $cond->();
       }
       else {
@@ -75,6 +78,7 @@ sub run {
       }
           
     }
+    #TryCatch::XS::_run_block($sub, $wa);
     $self->_run_block($sub, @args);
     last;
   }

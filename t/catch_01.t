@@ -50,6 +50,7 @@ sub simple_catch_type {
 
 sub catch_args {
   try {
+    no warnings 'uninitialized';
     die $_[0];
   }
   catch (ArrayRef[Int] $array) {
@@ -66,9 +67,10 @@ is(simple_die(), "We got a long Str error of 'Some str'", "simple_die");
 is(simple_catch_type([1,2,3]), "Got an array of 1 2 3", "simple_catch_type");
 is(simple_catch_type(''), "Got otherwise", "simple_catch_type");
 
+
 {
 local $TODO = 'sort out @_ bug';
 is(catch_args([1,2,3]), "Got an array of 1 2 3", "simple_catch_type");
-is(catch_args(''), "Got otherwise", "simple_catch_type");
 }
+is(catch_args(''), "Got otherwise", "simple_catch_type");
 

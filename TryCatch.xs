@@ -122,4 +122,3 @@ BOOT:
   if (getenv ("TRYCATCH_DEBUG")) {
     trycatch_debug = 1;
   }
-

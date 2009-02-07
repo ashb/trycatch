@@ -14,7 +14,7 @@ sub simple_return {
     return "i wont get here";
   }
 
-  die("foo\n");
+  die("return didn't unwind");
   return "bar";
 }
 

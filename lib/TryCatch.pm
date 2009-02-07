@@ -109,6 +109,13 @@ sub _parse_try {
   
 }
 
+sub prelude {
+  my ($ctx, $linestr) = @_;
+
+  substr($linestr, $ctx->offset+1, 0, 
+         "BEGIN { TryCatch::postlude }; local *_{ARRAY}");
+}
+
 sub postlude {
   on_scope_end { block_postlude() }
 }

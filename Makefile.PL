@@ -34,6 +34,11 @@ makemaker_args(
     $pkg->get_makefile_vars,
 );
 
+if ($Module::Install::AUTHOR) {
+  system('pod2text lib/TryCatch.pm > README');
+}
+
+
 WriteAll;
 
 
