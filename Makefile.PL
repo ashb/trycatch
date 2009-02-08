@@ -1,10 +1,10 @@
 use strict;
 use warnings;
 
-require 5.008001;
 
-use inc::Module::Install 0.77;
+use inc::Module::Install 0.79;
 
+perl_version '5.008001';
 name 'TryCatch';
 all_from 'lib/TryCatch.pm';
 
@@ -22,8 +22,13 @@ requires 'Variable::Magic' => 0.28;
 
 resources repository => 'http://github.com/ashb/trycatch/tree/master';
 
+my $under_cpan = $ENV{PERL5_CPANPLUS_IS_RUNNING} || $ENV{PERL5_CPAN_IS_RUNNING};
+
+# Does the toolchain support configure_requires
+# If yes, it should be here already.
 can_use('ExtUtils::Depends') or do {
   requires 'ExtUtils::Depends';
+  $under_cpan or auto_install();
   WriteAll;
   exit 1;
 };
@@ -39,6 +44,7 @@ if ($Module::Install::AUTHOR) {
 }
 
 
+$under_cpan or auto_install();
 WriteAll;
 
 
