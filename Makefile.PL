@@ -9,12 +9,21 @@ name 'TryCatch';
 all_from 'lib/TryCatch.pm';
 
 configure_requires 'ExtUtils::Depends';
+my $ok = 1;
+
+# Does the toolchain support configure_requires
+# If yes, it should be here already.
+can_use('ExtUtils::Depends') or do {
+  requires 'ExtUtils::Depends';
+  $ok = 0;
+};
+
 
 requires 'Parse::Method::Signatures' => '1.001000';
 requires 'B::Hooks::EndOfScope' => 0.05;
 requires 'B::Hooks::OP::Check' => 0.15;
 requires 'B::Hooks::OP::PPAddr' => 0.02;
-requires 'Devel::Declare';
+requires 'Devel::Declare' => '0.003004';
 requires 'Moose';
 requires 'MooseX::Types::Moose';
 requires 'Scope::Upper' => 0.06;
@@ -24,15 +33,11 @@ resources repository => 'http://github.com/ashb/trycatch/tree/master';
 
 my $under_cpan = $ENV{PERL5_CPANPLUS_IS_RUNNING} || $ENV{PERL5_CPAN_IS_RUNNING};
 
-# Does the toolchain support configure_requires
-# If yes, it should be here already.
-can_use('ExtUtils::Depends') or do {
-  requires 'ExtUtils::Depends';
+unless ($ok) {
   $under_cpan or auto_install();
   WriteAll;
   exit 1;
-};
-
+}
 
 my $pkg = ExtUtils::Depends->new('TryCatch', 'B::Hooks::OP::PPAddr', 'B::Hooks::OP::Check');
 makemaker_args(
