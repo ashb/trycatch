@@ -313,7 +313,7 @@ the type constraints (if any) will executed.
 =head1 BENEFITS
 
 B<return>. You can put a return in a try block, and it would do the right thing
-- namely return a value from the sub routinte you are in, instead of just from
+- namely return a value from the subroutine you are in, instead of just from
 the eval block. 
 
 B<Type Checking>. This is nothing you couldn't do manually yourself, it does it
