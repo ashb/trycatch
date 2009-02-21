@@ -12,7 +12,6 @@ use Parse::Method::Signatures;
 use Moose::Util::TypeConstraints;
 use Scope::Upper qw/unwind want_at :words/;
 use TryCatch::Exception;
-use TryCatch::TypeParser;
 use Carp qw/croak/;
 
 use base 'DynaLoader';
@@ -185,7 +184,15 @@ sub _parse_catch {
   # optional ()
   if (substr($linestr, $ctx->offset, 1) eq '(') {
     my $substr = substr($linestr, $ctx->offset+1);
-    my ($param, $left) = Parse::Method::Signatures->param($substr);
+    my ($param, $left) = Parse::Method::Signatures->param(
+      input => $substr,
+      type_constraint_callback => sub {
+        my ($tc, $name) = @_;
+
+        my $code = $pack->can($name);
+        $code ? $code->() : $tc->find_registered_constraint($name);
+      }
+    );
 
     die "can't handle un-named vars yet" unless $param->can('variable_name');
 
@@ -194,8 +201,9 @@ sub _parse_catch {
 
     # (TC $var)
     if ($param->has_type_constraints) {
-      my $parser = TryCatch::TypeParser->new(package => $pack);
-      my $tc = $parser->visit($param->type_constraints->data);
+      #use Data::Dumper; $Data::Dumper::Indent = 1;
+      #warn Dumper($param->isa('Parse::Method::Signatures::Param'));
+      my $tc = $param->type_constraints->tc;
       $TC_LIBRARY->{"$tc"} = $tc;
       push @conditions, "'$tc'";
     }
