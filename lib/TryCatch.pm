@@ -203,7 +203,7 @@ sub _parse_catch {
     if ($param->has_type_constraints) {
       #use Data::Dumper; $Data::Dumper::Indent = 1;
       #warn Dumper($param->isa('Parse::Method::Signatures::Param'));
-      my $tc = $param->type_constraints->tc;
+      my $tc = $param->meta_type_constraint;
       $TC_LIBRARY->{"$tc"} = $tc;
       push @conditions, "'$tc'";
     }
