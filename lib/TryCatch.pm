@@ -186,7 +186,7 @@ sub _parse_catch {
     my $substr = substr($linestr, $ctx->offset+1);
     my $sig = Parse::Method::Signatures->new(
       input => $substr,
-      in_package => $pack,
+      from_namespace => $pack,
     );
     my $errctx = $sig->ppi;
     my $param = $sig->param;
