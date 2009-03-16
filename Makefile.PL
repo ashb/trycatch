@@ -17,6 +17,7 @@ my $ok = 1;
 # Does the toolchain support configure_requires
 # If yes, it should be here already.
 can_use('ExtUtils::Depends') or do {
+  warn "***\n* Your CPAN toolchain is out of date. Please upgrade it\n***\n"; sleep 5;
   requires 'ExtUtils::Depends';
   
   unshift @INC, "$Bin/inc/EUDeps";
@@ -40,7 +41,7 @@ requires 'Sub::Exporter' => 0.979;
 
 resources repository => 'http://github.com/ashb/trycatch/tree/master';
 
-jsonmeta;
+jsonmeta();
 
 unless ($ok) {
   WriteAll;

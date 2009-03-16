@@ -17,7 +17,7 @@ use Carp qw/croak/;
 use base 'DynaLoader';
 
 
-our $VERSION = '1.000001';
+our $VERSION = '1.000002';
 our $PARSE_CATCH_NEXT = 0;
 our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH) = (undef, 0);
 

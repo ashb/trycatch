@@ -29,3 +29,4 @@
 TryCatch.c
 TryCatch.o
 TryCatch.bs
+inc/Module/Install/JSONMETA.pm
