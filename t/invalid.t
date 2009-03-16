@@ -44,7 +44,7 @@ eval <<'EOC';
 EOC
 
 like $@, 
-     qr!^Error parsing signature at '.{1,10}' at \(eval \d+\) line \d+$!,
+     qr!^Parameter expected near '\^' in '\^Err \$e' at\E \(eval \d+\) line \d+$!,
      "invalid catch signature";
 #warn "q{$@}";
 

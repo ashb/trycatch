@@ -184,15 +184,17 @@ sub _parse_catch {
   # optional ()
   if (substr($linestr, $ctx->offset, 1) eq '(') {
     my $substr = substr($linestr, $ctx->offset+1);
-    my ($param, $left) = Parse::Method::Signatures->param(
+    my $sig = Parse::Method::Signatures->new(
       input => $substr,
-      type_constraint_callback => sub {
-        my ($tc, $name) = @_;
-
-        my $code = $pack->can($name);
-        $code ? $code->() : $tc->find_registered_constraint($name);
-      }
+      in_package => $pack,
     );
+    my $errctx = $sig->ppi;
+    my $param = $sig->param;
+
+    $sig->error( $errctx, "Parameter expected")
+      unless $param;
+
+    my $left = $sig->remaining_input;
 
     die "can't handle un-named vars yet" unless $param->can('variable_name');
 
@@ -201,8 +203,6 @@ sub _parse_catch {
 
     # (TC $var)
     if ($param->has_type_constraints) {
-      #use Data::Dumper; $Data::Dumper::Indent = 1;
-      #warn Dumper($param->isa('Parse::Method::Signatures::Param'));
       my $tc = $param->meta_type_constraint;
       $TC_LIBRARY->{"$tc"} = $tc;
       push @conditions, "'$tc'";

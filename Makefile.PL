@@ -27,7 +27,7 @@ can_use('ExtUtils::Depends') or do {
 };
 
 
-requires 'Parse::Method::Signatures' => '1.001000';
+requires 'Parse::Method::Signatures' => '1.003003';
 requires 'B::Hooks::EndOfScope' => 0.05;
 requires 'B::Hooks::OP::Check' => 0.15;
 requires 'B::Hooks::OP::PPAddr' => 0.02;
@@ -40,14 +40,9 @@ requires 'Sub::Exporter' => 0.979;
 
 resources repository => 'http://github.com/ashb/trycatch/tree/master';
 
-# Old vers of CPAN dont set the env var. safer to assume we are running than
-# ask about deps twice
-my $under_cpan = $ENV{PERL5_CPANPLUS_IS_RUNNING} || 
-                 $ENV{PERL5_CPAN_IS_RUNNING} || 
-                 do { require CPAN; $CPAN::VERSION < 1.92 };
+jsonmeta;
 
 unless ($ok) {
-  $under_cpan or auto_install();
   WriteAll;
   exit 1;
 }
@@ -82,7 +77,6 @@ if ($Module::Install::AUTHOR) {
 }
 }
 
-$under_cpan or auto_install();
 WriteAll;
 
 

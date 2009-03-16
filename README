@@ -64,8 +64,8 @@ SYNTAX
 
 BENEFITS
     return. You can put a return in a try block, and it would do the right
-    thing - namely return a value from the subroutine you are in, instead
-    of just from the eval block.
+    thing - namely return a value from the subroutine you are in, instead of
+    just from the eval block.
 
     Type Checking. This is nothing you couldn't do manually yourself, it
     does it for you using Moose type constraints.

@@ -1,5 +1,7 @@
 Version history for TryCatch perl module:
 
+  - Update to more modern Parse::Method::Signatures
+
 1.000001 - Sat 14th Feb 2009 22:16
   - Attempt to improve installability with old CPAN toolchains
 
