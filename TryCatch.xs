@@ -11,7 +11,6 @@ STATIC I32
 dump_cxstack()
 {
   //dVAR;
-  SV* sv;
   I32 i;
   for (i = cxstack_ix; i >= 0; i--) {
     register const PERL_CONTEXT * const cx = cxstack+i;
