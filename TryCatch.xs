@@ -80,6 +80,8 @@ STATIC OP* check_return (pTHX_ OP *op, void *user_data) {
 
 MODULE = TryCatch PACKAGE = TryCatch::XS
 
+PROTOTYPES: DISABLE
+
 void 
 install_return_op_check()
   CODE:
