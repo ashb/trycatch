@@ -19,14 +19,18 @@ my $ok = 1;
 can_use('ExtUtils::Depends') or do {
   warn "***\n* Your CPAN toolchain is out of date. Please upgrade it\n***\n"; sleep 5;
   requires 'ExtUtils::Depends';
+  requires 'B::Hooks::OP::Check' => 0.15;
+  requires 'B::Hooks::OP::PPAddr' => 0.02;
   
-  unshift @INC, "$Bin/inc/EUDeps";
-  can_use('ExtUtils::Depends') or do {
-    warn "ExtUtils::Depends not installed and can't use version from inc!";
-    $ok = 0;
-  }
 };
 
+# Currently CPAN client dont seem to get on with JSON meta, so always use our 
+# version from inc/EUDeps
+unshift @INC, "$Bin/inc/EUDeps";
+can_use('ExtUtils::Depends') or do {
+  warn "ExtUtils::Depends not installed and can't use version from inc!";
+  $ok = 0;
+};
 
 requires 'Parse::Method::Signatures' => '1.003003';
 requires 'B::Hooks::EndOfScope' => 0.05;
@@ -41,6 +45,7 @@ requires 'Sub::Exporter' => 0.979;
 
 resources repository => 'http://github.com/ashb/trycatch/tree/master';
 
+auto_provides;
 jsonmeta();
 
 unless ($ok) {
@@ -51,6 +56,7 @@ unless ($ok) {
 my $pkg = ExtUtils::Depends->new('TryCatch', 'B::Hooks::OP::PPAddr', 'B::Hooks::OP::Check');
 makemaker_args(
     $pkg->get_makefile_vars,
+    dist => { PREOP => 'cp META.yml META.json' }
 );
 
 { no warnings 'once';

@@ -1,5 +1,8 @@
 Version history for TryCatch perl module:
 
+1.000003 - 2009/04/21 - 10:37
+  - Makefile.PL tweaks
+
 1.000002 - 2009/04/16 - 21:57
   - Update to more modern Parse::Method::Signatures
 
