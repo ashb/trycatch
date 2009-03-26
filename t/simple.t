@@ -39,6 +39,8 @@ is(simple_no_return(), "bar", "try without explicity return");
 is(use_test(), 42, "use in try block");
 
 my $ran_catch = 0;
+my $warnings = 0;
+$SIG{__WARN__} = sub { $warnings++; CORE::warn(@_) };
 
 try {
     foo();
@@ -47,6 +49,7 @@ catch ($e) {
   $ran_catch = 1;
 }
 is($ran_catch, 0, "Catch block not run");
+is($warnings, 0, "No warnings from try in not in sub");
 
 sub foo {
     return 1;

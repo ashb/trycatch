@@ -47,7 +47,7 @@ sub run {
   local $CTX = $CTX;
 
   my ($package) = caller(1);
-  if ($package eq __PACKAGE__) {
+  if (defined $package && $package eq __PACKAGE__) {
     # nested: try { try {} }
     die "Internal Error: Nested try without CTX" unless defined $CTX;
   } else {
