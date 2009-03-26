@@ -88,31 +88,25 @@ sub _parse_try {
 
   my $ctx = Devel::Declare::Context::Simple->new->init(@_);
 
-  if (my $len = Devel::Declare::toke_scan_ident( $ctx->offset )) {
-    $ctx->inc_offset($len);
-    $ctx->skipspace;
+  $ctx->skip_declarator;
+  $ctx->skipspace;
 
-    my $linestr = $ctx->get_linestr;
-    croak "block required after try"
-      unless substr($linestr, $ctx->offset, 1) eq '{';
+  my $linestr = $ctx->get_linestr;
 
-    substr($linestr, $ctx->offset+1,0) = q# BEGIN { TryCatch::postlude() }#;
-    substr($linestr, $ctx->offset,0) = q#(sub #;
-    $ctx->set_linestr($linestr);
+  return if substr($linestr, $ctx->offset, 2) eq '=>';
 
-    if (! $CHECK_OP_DEPTH++) {
-      $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
-    }
+  croak "block required after try"
+    unless substr($linestr, $ctx->offset, 1) eq '{';
 
+  substr($linestr, $ctx->offset+1,0) = q# BEGIN { TryCatch::postlude() }#;
+  substr($linestr, $ctx->offset,0) = q#(sub #;
+  $ctx->set_linestr($linestr);
+
+  if (! $CHECK_OP_DEPTH++) {
+    $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
   }
+
   
-}
-
-sub prelude {
-  my ($ctx, $linestr) = @_;
-
-  substr($linestr, $ctx->offset+1, 0, 
-         "BEGIN { TryCatch::postlude }; local *_{ARRAY}");
 }
 
 sub postlude {
@@ -120,6 +114,8 @@ sub postlude {
 }
 
 # Called after the block from try {} or catch {}
+# Look ahead and determine what action to take based on wether or note we
+# see a 'catch' token after the block
 sub block_postlude {
 
   my $ctx = Devel::Declare::Context::Simple->new->init(
@@ -140,6 +136,7 @@ sub block_postlude {
   if (--$CHECK_OP_DEPTH == 0) {
     TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
   }
+
   if ($toke eq 'catch') {
 
     $ctx->skipspace;
@@ -159,6 +156,7 @@ sub _parse_catch {
   my $pack = shift;
   my $ctx = Devel::Declare::Context::Simple->new->init(@_);
 
+  # Only parse catch when we've been told to (set in block_postlude)
   return unless $TryCatch::PARSE_CATCH_NEXT;
   $TryCatch::PARSE_CATCH_NEXT = 0;
 
@@ -172,7 +170,7 @@ sub _parse_catch {
 
   my $len = length "->catch";
   my $sub = substr($linestr, $ctx->offset, $len);
-  die "_parse_catch expects to find '->catch' in linestr, found: "  
+  croak "Internal Error: _parse_catch expects to find '->catch' in linestr, found: "  
     . substr($linestr, $ctx->offset, $len)
     unless $sub eq '->catch';
 
@@ -196,7 +194,7 @@ sub _parse_catch {
 
     my $left = $sig->remaining_input;
 
-    die "can't handle un-named vars yet" unless $param->can('variable_name');
+    croak "TryCatch can't handle un-named vars in catch signature" unless $param->can('variable_name');
 
     my $name = $param->variable_name;
     $var_code .= "my $name = \$@;";
