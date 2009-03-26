@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 8;
+use Test::More tests => 9;
 use Test::Exception;
 use TryCatch;
 
@@ -38,21 +38,22 @@ catch (^Err $e) {}
 EOC
 
 
-TODO: { 
-local $TODO = "Make this error better";
-
 test_for_error(
-  qr!^'\)' required after catch signature at \(eval \d+\) line 4!,
+  qr/^Run-away catch signature at \(eval \d+\) line 4/,
   "invalid catch signature (missing parenthesis)",
   <<'EOC');
 use TryCatch;
 
 try { }
-catch ( {}
+catch ( 
 
+
+
+{}
+
+1;
 EOC
 
-}
 
 
 test_for_error(
@@ -73,6 +74,18 @@ test_for_error(
 use TryCatch;
 
 catch;
+EOC
+
+
+test_for_error(
+  qr/^'SomeRandomTC' could not be parsed to a type constraint .*? at \(eval \d+\) line 4\b/,
+  "Undefined TC",
+  <<'EOC');
+use TryCatch;
+
+try { }
+catch (SomeRandomTC $e) {}
+
 EOC
 
 compile_ok("try is not too reserved", <<'EOC');

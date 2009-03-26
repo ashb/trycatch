@@ -181,9 +181,12 @@ sub _parse_catch {
   my @conditions;
   # optional ()
   if (substr($linestr, $ctx->offset, 1) eq '(') {
-    my $substr = substr($linestr, $ctx->offset+1);
+    my $proto = $ctx->strip_proto;
+    croak "Run-away catch signature"
+      unless (length $proto);
+    
     my $sig = Parse::Method::Signatures->new(
-      input => $substr,
+      input => $proto,
       from_namespace => $pack,
     );
     my $errctx = $sig->ppi;
@@ -213,15 +216,16 @@ sub _parse_catch {
       }
     }
 
-    substr($linestr, $ctx->offset, length($linestr) - $ctx->offset - length($left), '');
-    $ctx->set_linestr($linestr);
+    #substr($linestr, $ctx->offset, length($linestr) - $ctx->offset - length($left), '');
+    #$ctx->set_linestr($linestr);
     $ctx->skipspace;
-    if (substr($linestr, $ctx->offset, 1) ne ')') {
-      croak "')' expected after catch signature";
-    }
+    $linestr = $ctx->get_linestr;
+    #if (substr($linestr, $ctx->offset, 1) ne ')') {
+    #  croak "')' expected after catch signature";
+    #}
 
-    substr($linestr, $ctx->offset, 1, '');
-    $ctx->set_linestr($linestr);
+    #substr($linestr, $ctx->offset, 1, '');
+    #$ctx->set_linestr($linestr);
     $ctx->skipspace;
   }
 

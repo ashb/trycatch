@@ -33,7 +33,7 @@ sub _run_block {
   my @ret;
   my $wa = want_at $CTX;
   if ($wa) {
-    @ret = $code->(); 
+    @ret = $code->();
   } elsif (defined $wa) {
     $ret[0] = $code->();
   } else {
@@ -54,7 +54,6 @@ sub run {
     $CTX = $self->ctx;
   }
 
-  my $wa = want_at $CTX;
   local $@;
   eval {
     $self->_run_block($self->try, @args);
@@ -78,7 +77,6 @@ sub run {
       }
           
     }
-    #TryCatch::XS::_run_block($sub, $wa);
     $self->_run_block($sub, @args);
     last;
   }
