@@ -61,7 +61,7 @@ sub run {
   };
 
   # If we get here there was either no explicit return or an error
-  return unless defined($@);
+  return unless $@;
   my $err = $@;
 
   CATCH: for my $catch ( @{$self->catches} ) {
