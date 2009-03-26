@@ -8,3 +8,6 @@ blib/
 inc/
 META.yml
 MANIFEST
+META.json
+*.bak
+TryCatch-*
