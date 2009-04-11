@@ -96,7 +96,7 @@ sub _parse_try {
   return if substr($linestr, $ctx->offset, 2) eq '=>';
 
   $ctx->inject_if_block(
-    q# BEGIN { TryCatch::postlude() }#,
+    $ctx->scope_injector_call,
     q#( sub#
   ) or croak "block required after try";
 
@@ -107,8 +107,10 @@ sub _parse_try {
   
 }
 
-sub postlude {
-  on_scope_end { block_postlude() }
+sub inject_scope {
+  on_scope_end { 
+    block_postlude() 
+  }
 }
 
 # Called after the block from try {} or catch {}
@@ -220,7 +222,7 @@ sub _parse_catch {
   push @conditions, "sub ";
 
   $ctx->inject_if_block(
-    q# BEGIN { TryCatch::postlude() }# . $var_code,
+    $ctx->scope_injector_call . $var_code,
     '(' . join(', ', @conditions)
   ) or croak "block required after catch";
 
