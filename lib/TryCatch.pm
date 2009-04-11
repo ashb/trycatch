@@ -14,7 +14,7 @@ use Scope::Upper qw/unwind want_at :words/;
 use TryCatch::Exception;
 use Carp qw/croak/;
 
-use base 'DynaLoader';
+use base qw/DynaLoader Devel::Declare::Context::Simple/;
 
 
 our $VERSION = '1.000003';
@@ -86,7 +86,7 @@ sub _parse_try {
   # Hide Devel::Declare from carp;
   local $Carp::Internal{'Devel::Declare'} = 1;
 
-  my $ctx = Devel::Declare::Context::Simple->new->init(@_);
+  my $ctx = TryCatch->new->init(@_);
 
   $ctx->skip_declarator;
   $ctx->skipspace;
@@ -95,12 +95,10 @@ sub _parse_try {
 
   return if substr($linestr, $ctx->offset, 2) eq '=>';
 
-  croak "block required after try"
-    unless substr($linestr, $ctx->offset, 1) eq '{';
-
-  substr($linestr, $ctx->offset+1,0) = q# BEGIN { TryCatch::postlude() }#;
-  substr($linestr, $ctx->offset,0) = q#(sub #;
-  $ctx->set_linestr($linestr);
+  $ctx->inject_if_block(
+    q# BEGIN { TryCatch::postlude() }#,
+    q#( sub#
+  ) or croak "block required after try";
 
   if (! $CHECK_OP_DEPTH++) {
     $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
@@ -118,7 +116,7 @@ sub postlude {
 # see a 'catch' token after the block
 sub block_postlude {
 
-  my $ctx = Devel::Declare::Context::Simple->new->init(
+  my $ctx = TryCatch->new->init(
     '', 
     Devel::Declare::get_linestr_offset()
   );
@@ -131,6 +129,7 @@ sub block_postlude {
 
   if ($len = Devel::Declare::toke_scan_word($offset, 1 )) {
     $toke = substr( $linestr, $offset, $len );
+    $ctx->{Declarator} = $toke;
   }
 
   if (--$CHECK_OP_DEPTH == 0) {
@@ -154,7 +153,7 @@ sub block_postlude {
 # the '->' is added by one of the postlude hooks
 sub _parse_catch {
   my $pack = shift;
-  my $ctx = Devel::Declare::Context::Simple->new->init(@_);
+  my $ctx = TryCatch->new->init(@_);
 
   # Only parse catch when we've been told to (set in block_postlude)
   return unless $TryCatch::PARSE_CATCH_NEXT;
@@ -197,7 +196,8 @@ sub _parse_catch {
 
     my $left = $sig->remaining_input;
 
-    croak "TryCatch can't handle un-named vars in catch signature" unless $param->can('variable_name');
+    croak "TryCatch can't handle un-named vars in catch signature" 
+      unless $param->can('variable_name');
 
     my $name = $param->variable_name;
     $var_code .= "my $name = \$@;";
@@ -216,27 +216,14 @@ sub _parse_catch {
       }
     }
 
-    #substr($linestr, $ctx->offset, length($linestr) - $ctx->offset - length($left), '');
-    #$ctx->set_linestr($linestr);
-    $ctx->skipspace;
-    $linestr = $ctx->get_linestr;
-    #if (substr($linestr, $ctx->offset, 1) ne ')') {
-    #  croak "')' expected after catch signature";
-    #}
-
-    #substr($linestr, $ctx->offset, 1, '');
-    #$ctx->set_linestr($linestr);
-    $ctx->skipspace;
   }
-
-  croak "block required after catch"
-    unless substr($linestr, $ctx->offset, 1) eq '{';
-
-  substr($linestr, $ctx->offset+1,0) = 
-    q# BEGIN { TryCatch::postlude() }# . $var_code;
   push @conditions, "sub ";
-  substr($linestr, $ctx->offset,0) = '(' . join(', ', @conditions);
-  $ctx->set_linestr($linestr);
+
+  $ctx->inject_if_block(
+    q# BEGIN { TryCatch::postlude() }# . $var_code,
+    '(' . join(', ', @conditions)
+  ) or croak "block required after catch";
+
 
   if (! $CHECK_OP_DEPTH++) {
     $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
