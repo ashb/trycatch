@@ -3,6 +3,7 @@ Version history for TryCatch perl module:
   - Fix bug where catch block would get run sometimes when it shouldn't
   - Better error reporting
   - Make try 'less reserved' (i.e. so { try => 'foo' } works)
+  - Internal refactoring to use Devel::Declare better
 
 1.000003 - 2009/04/21 - 10:37
   - Makefile.PL tweaks

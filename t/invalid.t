@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 9;
+use Test::More tests => 10;
 use Test::Exception;
 use TryCatch;
 
@@ -94,12 +94,24 @@ use TryCatch;
 try => 1;
 EOC
 
+
 compile_ok(
   "catch is not special", 
   <<'EOC');
 use TryCatch;
 
 catch => 3;
+EOC
+
+compile_ok("POD doesn't interfer with things.", <<'EOC');
+use TryCatch;
+
+try {
+}
+
+=head1 POD
+
+=cut
 EOC
 
 sub test_for_error {

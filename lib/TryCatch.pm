@@ -10,7 +10,7 @@ use B::Hooks::OP::PPAddr;
 use Devel::Declare::Context::Simple;
 use Parse::Method::Signatures;
 use Moose::Util::TypeConstraints;
-use Scope::Upper qw/unwind want_at :words/;
+use Scope::Upper qw/localize unwind want_at :words/;
 use TryCatch::Exception;
 use Carp qw/croak/;
 
@@ -18,8 +18,10 @@ use base qw/DynaLoader Devel::Declare::Context::Simple/;
 
 
 our $VERSION = '1.000003';
-our $PARSE_CATCH_NEXT = 0;
+
+# These are private state variables. Mess with them at your peril
 our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH) = (undef, 0);
+our (@STATE);
 
 sub dl_load_flags { 0x01 }
 
@@ -40,9 +42,6 @@ use Sub::Exporter -setup => {
           { $name => { const => sub { $parser->($pack, @_) } } },
         );
       }
-      if (my $code = __PACKAGE__->can("_extras_for_${name}")) {
-        $code->($pack);
-      }
     }
     Sub::Exporter::default_installer(@_);
 
@@ -51,9 +50,12 @@ use Sub::Exporter -setup => {
 
 
 # The actual try call itself. Nothing to do with parsing.
-sub try {
+sub try () {
+  warn "non-shadowed";
+  return;
   my ($sub) = @_;
 
+  Carp::cluck "I dont want to be called. fail";
   return new TryCatch::Exception( try => $sub, ctx => SUB(CALLER(1)) );
 
 }
@@ -62,22 +64,15 @@ sub try {
 # Not sure we really want to do this, but we will for now.
 our $TC_LIBRARY = {};
 
-sub get_tc {
+sub check_tc {
   my ($class, $tc) = @_;
 
-  $TC_LIBRARY->{$tc} or die "Unable to find parse TC for '$tc'";
+  my $type = $TC_LIBRARY->{$tc} or die "Unable to find parse TC for '$tc'";
+
+  return $type->check($TryCatch::Error);
 }
 
 # From here on out its parsing methods.
-
-sub _extras_for_try {
-  my ($pack) = @_;
-
-  Devel::Declare->setup_for(
-    $pack,
-    { catch => { const => sub { _parse_catch($pack, @_) } } }
-  );
-}
 
 # Replace 'try {' with an 'try (sub {'
 sub _parse_try {
@@ -93,18 +88,46 @@ sub _parse_try {
 
   my $linestr = $ctx->get_linestr;
 
-  return if substr($linestr, $ctx->offset, 2) eq '=>';
+  # Shadow try to be a constant no-op sub
+  $ctx->shadow(sub () { } );
 
   $ctx->inject_if_block(
-    $ctx->scope_injector_call,
-    q#( sub#
+    $ctx->injected_try_code . $ctx->scope_injector_call,
+    q#;#
   ) or croak "block required after try";
 
+  #$ctx->debug_linestr("try");
   if (! $CHECK_OP_DEPTH++) {
     $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
   }
 
+  # Number of catch blocks found, we only care about 0,1 and +1 cases tho
+  push @STATE, 0;
   
+}
+
+sub setup_return_ctx {
+  # If CTX is already setup that means we are in a nested try. That or someone
+  # did naughty things. Their problem if they did
+  localize '$TryCatch::Exception::CTX', UP() => UP()
+    unless $TryCatch::Exception::CTX;
+}
+
+sub injected_try_code {
+  # try { ...
+  # ->
+  # try; { local $@; eval { ...
+  return 'local $@; eval {';
+  #return 'local $@; TryCatch->setup_return_ctx; eval {';
+}
+
+sub injected_after_try {
+  # This semicolon is for the end of the eval
+  return '; local $TryCatch::Error = $@;';
+}
+
+sub injected_no_catch_code {
+  return "};";
 }
 
 sub inject_scope {
@@ -117,7 +140,6 @@ sub inject_scope {
 # Look ahead and determine what action to take based on wether or note we
 # see a 'catch' token after the block
 sub block_postlude {
-
   my $ctx = TryCatch->new->init(
     '', 
     Devel::Declare::get_linestr_offset()
@@ -129,9 +151,12 @@ sub block_postlude {
   my $toke = '';
   my $len = 0;
 
+  # Since we're not being called from a normal D::D callback, we have to
+  # find this info manually.
   if ($len = Devel::Declare::toke_scan_word($offset, 1 )) {
     $toke = substr( $linestr, $offset, $len );
     $ctx->{Declarator} = $toke;
+  } else {
   }
 
   if (--$CHECK_OP_DEPTH == 0) {
@@ -139,14 +164,25 @@ sub block_postlude {
   }
 
   if ($toke eq 'catch') {
+    # We don't want the 'catch' token in the output since it messes up the
+    # if/else we build up. So dont let control go back to perl just yet.
 
-    $ctx->skipspace;
-    substr($linestr, $ctx->offset, 0) = ')->';
+    $ctx->_parse_catch;
+
+  } else  {
+    my $code = $STATE[-1] == 0
+             ? $ctx->injected_no_catch_code
+             : '}';
+
+    substr($linestr, $offset, 0, $code);
+
+    $ctx->debug_linestr("finalizer");
+
+    #$ctx->debug_linestr('block_postlude');
     $ctx->set_linestr($linestr);
-    $TryCatch::PARSE_CATCH_NEXT = 1;
-  } else {
-    substr($linestr, $offset, 0) = ')->run(@_);';
-    $ctx->set_linestr($linestr);
+
+    # This try/catch stmt is finished
+    pop @STATE;
   }
 }
 
@@ -154,31 +190,25 @@ sub block_postlude {
 # turn 'catch() {' into '->catch({ TC_check_code;'
 # the '->' is added by one of the postlude hooks
 sub _parse_catch {
-  my $pack = shift;
-  my $ctx = TryCatch->new->init(@_);
+  my $ctx = shift;
+  my $pack = $ctx->get_curstash_name;
 
-  # Only parse catch when we've been told to (set in block_postlude)
-  return unless $TryCatch::PARSE_CATCH_NEXT;
-  $TryCatch::PARSE_CATCH_NEXT = 0;
 
   # Hide Devel::Declare from carp;
   local $Carp::Internal{'Devel::Declare'} = 1;
   local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
   local $Carp::Internal{'TryCatch'} = 1;
 
+  # This isn't a normal DD-callback, so we can strip_name to get rid of try
+  $ctx->strip_name;
   $ctx->skipspace;
+
+  $ctx->debug_linestr('catch');
   my $linestr = $ctx->get_linestr;
 
-  my $len = length "->catch";
-  my $sub = substr($linestr, $ctx->offset, $len);
-  croak "Internal Error: _parse_catch expects to find '->catch' in linestr, found: "  
-    . substr($linestr, $ctx->offset, $len)
-    unless $sub eq '->catch';
-
-  $ctx->inc_offset($len);
-  $ctx->skipspace;
-
+  my $code;
   my $var_code = "";
+
   my @conditions;
   # optional ()
   if (substr($linestr, $ctx->offset, 1) eq '(') {
@@ -202,34 +232,62 @@ sub _parse_catch {
       unless $param->can('variable_name');
 
     my $name = $param->variable_name;
-    $var_code .= "my $name = \$@;";
+    push @conditions, "(my $name = \$TryCatch::Error)";
 
     # (TC $var)
     if ($param->has_type_constraints) {
       my $tc = $param->meta_type_constraint;
       $TC_LIBRARY->{"$tc"} = $tc;
-      push @conditions, "'$tc'";
+      push @conditions, "TryCatch->check_tc('$tc')";
     }
 
     # ($var where { $_ } )
     if ($param->has_constraints) {
       foreach my $con (@{$param->constraints}) {
-        push @conditions, "sub $con";
+        $con =~ s/^{|}$//;
+        push @conditions, "do {local \$_ = \$TryCatch::Error; $con }";
       }
     }
 
+    $linestr = $ctx->get_linestr;
   }
-  push @conditions, "sub ";
+
+  $code = $ctx->injected_after_try
+    if $STATE[-1] == 0;
+
+  $code .= $STATE[-1] < 1
+         ? "if ("
+         : "elsif (";
 
   $ctx->inject_if_block(
-    $ctx->scope_injector_call . $var_code,
-    '(' . join(', ', @conditions)
+    $ctx->scope_injector_call,
+    $code . join(' && ', @conditions) . ')'
   ) or croak "block required after catch";
 
+  $ctx->debug_linestr('post catch');
 
   if (! $CHECK_OP_DEPTH++) {
     $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
   }
+
+  $STATE[-1]++;
+}
+
+sub debug_linestr {
+  my ($ctx, $message) = @_;
+
+  return unless $ENV{TRYCATCH_DEBUG};
+ 
+  local $Carp::Internal{'TryCatch'} = 1;
+  local $Carp::Internal{'Devel::Declare'} = 1;
+  local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
+  local $Carp::Internal{'Devel::PartialDump'} = 1;
+  Carp::cluck($message) if $message;
+
+  require Devel::PartialDump;
+
+  warn   "  Substr: ", Devel::PartialDump::dump(substr($ctx->get_linestr, $ctx->offset)),
+       "\n  Whole:  ", Devel::PartialDump::dump($ctx->get_linestr), "\n";
 }
 
 
