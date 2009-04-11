@@ -36,7 +36,7 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   PERL_UNUSED_VAR(op);
   PERL_UNUSED_VAR(user_data);
 
-  ctx = get_sv("TryCatch::Exception::CTX", 0);
+  ctx = get_sv("TryCatch::CTX", 0);
   if (ctx) {
     XPUSHs(ctx);
     PUTBACK;

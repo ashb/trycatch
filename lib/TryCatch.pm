@@ -106,24 +106,16 @@ sub _parse_try {
   
 }
 
-sub setup_return_ctx {
-  # If CTX is already setup that means we are in a nested try. That or someone
-  # did naughty things. Their problem if they did
-  localize '$TryCatch::Exception::CTX', UP() => UP()
-    unless $TryCatch::Exception::CTX;
-}
-
 sub injected_try_code {
   # try { ...
   # ->
   # try; { local $@; eval { ...
-  return 'local $@; eval {';
-  #return 'local $@; TryCatch->setup_return_ctx; eval {';
+  return 'local $@; local $TryCatch::CTX = Scope::Upper::HERE() unless defined $TryCatch::CTX; eval {';
 }
 
 sub injected_after_try {
   # This semicolon is for the end of the eval
-  return '; local $TryCatch::Error = $@;';
+  return '; if ($@) { local $TryCatch::Error = $@;';
 }
 
 sub injected_no_catch_code {
@@ -172,7 +164,7 @@ sub block_postlude {
   } else  {
     my $code = $STATE[-1] == 0
              ? $ctx->injected_no_catch_code
-             : '}';
+             : '}}';
 
     substr($linestr, $offset, 0, $code);
 
@@ -232,7 +224,7 @@ sub _parse_catch {
       unless $param->can('variable_name');
 
     my $name = $param->variable_name;
-    push @conditions, "(my $name = \$TryCatch::Error)";
+    $var_code = "my $name = \$TryCatch::Error;";
 
     # (TC $var)
     if ($param->has_type_constraints) {
@@ -255,12 +247,15 @@ sub _parse_catch {
   $code = $ctx->injected_after_try
     if $STATE[-1] == 0;
 
+  @conditions = ('1')
+    unless @conditions;
+
   $code .= $STATE[-1] < 1
          ? "if ("
          : "elsif (";
 
   $ctx->inject_if_block(
-    $ctx->scope_injector_call,
+    $ctx->scope_injector_call . $var_code,
     $code . join(' && ', @conditions) . ')'
   ) or croak "block required after catch";
 
