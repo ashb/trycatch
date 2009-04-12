@@ -94,12 +94,16 @@ sub _parse_try {
   $ctx->inject_if_block(
     $ctx->injected_try_code . $ctx->scope_injector_call,
     q#;#
+    # TODO: unwinding
+    # q#; (sub #
   ) or croak "block required after try";
 
   #$ctx->debug_linestr("try");
   if (! $CHECK_OP_DEPTH++) {
     $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
   }
+
+  $ctx->debug_linestr('post try');
 
   # Number of catch blocks found, we only care about 0,1 and +1 cases tho
   push @STATE, 0;
@@ -110,7 +114,12 @@ sub injected_try_code {
   # try { ...
   # ->
   # try; { local $@; eval { ...
-  return 'local $@; local $TryCatch::CTX = Scope::Upper::HERE() unless defined $TryCatch::CTX; eval {';
+
+  #TODO: unwinding
+  #return 'local $@; local $TryCatch::CTX = Scope::Upper::HERE unless defined $TryCatch::CTX; eval {';
+  return @STATE > 1
+       ? 'eval {' # Nested. easy.
+       : 'local $@; local $TryCatch::CTX = Scope::Upper::HERE; eval {'
 }
 
 sub injected_after_try {
@@ -120,6 +129,8 @@ sub injected_after_try {
 
 sub injected_no_catch_code {
   return "};";
+  #TODO: unwinding
+  #return "})->();";
 }
 
 sub inject_scope {
@@ -165,6 +176,8 @@ sub block_postlude {
     my $code = $STATE[-1] == 0
              ? $ctx->injected_no_catch_code
              : '}}';
+             # TODO: unwinding
+             #: '}})->();';
 
     substr($linestr, $offset, 0, $code);
 
@@ -236,7 +249,7 @@ sub _parse_catch {
     # ($var where { $_ } )
     if ($param->has_constraints) {
       foreach my $con (@{$param->constraints}) {
-        $con =~ s/^{|}$//;
+        $con =~ s/^{|}$//g;
         push @conditions, "do {local \$_ = \$TryCatch::Error; $con }";
       }
     }
@@ -282,7 +295,7 @@ sub debug_linestr {
   require Devel::PartialDump;
 
   warn   "  Substr: ", Devel::PartialDump::dump(substr($ctx->get_linestr, $ctx->offset)),
-       "\n  Whole:  ", Devel::PartialDump::dump($ctx->get_linestr), "\n";
+       "\n  Whole:  ", Devel::PartialDump::dump($ctx->get_linestr), "\n\n";
 }
 
 
