@@ -118,8 +118,8 @@ sub injected_try_code {
   #TODO: unwinding
   #return 'local $@; local $TryCatch::CTX = Scope::Upper::HERE unless defined $TryCatch::CTX; eval {';
   return @STATE > 1
-       ? 'eval {' # Nested. easy.
-       : 'local $@; local $TryCatch::CTX = Scope::Upper::HERE; eval {'
+       ? 'local $TryCatch::CTX = Scope::Upper::HERE; eval {' # Nested case
+       : 'local $@; eval {'
 }
 
 sub injected_after_try {
