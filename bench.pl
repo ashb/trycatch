@@ -17,7 +17,6 @@ BEGIN {
 
 
 
-use Exception::Base 'Exception::My';
 our %tests = (
     '01_EvalDieScalar' => sub {
 
@@ -43,8 +42,9 @@ our %tests = (
     },
 );
 
-=for comment
 
+eval { 
+  eval q{use Exception::Base 'Exception::My'};
 $tests{ '03_ExceptionEval' } = sub {
 
         eval {
@@ -71,7 +71,7 @@ $tests{ '04_Exception1Eval' } = sub {
         };
 
     };
-);
+};
 
 eval q{
     die 1;
@@ -100,7 +100,6 @@ eval q{
 };
 
 eval {
-    die 1;
     package My::ClassThrowable;
     require Class::Throwable;
     Class::Throwable->import;
@@ -121,7 +120,6 @@ eval {
 };
 
 eval {
-    die 1;
     package My::ExceptionClass;
     require Exception::Class;
     Exception::Class->import('MyException');
@@ -140,7 +138,6 @@ eval {
 };
 
 eval q{
-    die 1;
     package My::ExceptionClassTC;
     BEGIN {
         eval {
@@ -166,7 +163,6 @@ eval q{
     };
 };
 
-=cut
 
 {
     package My::TryCatch;
