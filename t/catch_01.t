@@ -1,12 +1,8 @@
 use strict;
 use warnings;
 use Test::More tests => 7;
-use Scope::Upper qw/unwind :words/;
 
 BEGIN { use_ok "TryCatch" or BAIL_OUT("Cannot load TryCatch") };
-#use TryCatch;
-
-=for cut
 
 sub simple_no_die {
   try {
@@ -40,8 +36,6 @@ sub simple_die {
 }
 is(simple_die(), "We got a long Str error of 'Some str'", "simple_die");
 
-=cut
-
 
 sub simple_catch_type {
   my @args = @_;
@@ -53,7 +47,6 @@ sub simple_catch_type {
     fail("didn't unwind");
   }
   catch ($e) {
-    warn SUB(); 
     return "Got otherwise";
   }
   fail("didn't unwind or catch");
@@ -62,7 +55,6 @@ is(simple_catch_type([1,2,3]), "Got an array of 1 2 3", "simple_catch_type");
 is(simple_catch_type(''), "Got otherwise", "simple_catch_type");
 
 
-=for comment
 sub catch_args {
   try {
     no warnings 'uninitialized';
@@ -77,10 +69,6 @@ sub catch_args {
 }
 
 
-{
-local $TODO = 'sort out @_ bug';
 is(catch_args([1,2,3]), "Got an array of 1 2 3", "simple_catch_type");
-}
 is(catch_args(''), "Got otherwise", "simple_catch_type");
 
-=cut
