@@ -162,7 +162,7 @@ sub block_postlude {
   } else {
   }
 
-  if (--$CHECK_OP_DEPTH == 0) {
+  if ($CHECK_OP_DEPTH && --$CHECK_OP_DEPTH == 0) {
     TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
   }
 
@@ -274,9 +274,9 @@ sub _parse_catch {
 
   $ctx->debug_linestr('post catch');
 
-  if (! $CHECK_OP_DEPTH++) {
-    $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
-  }
+  #if (! $CHECK_OP_DEPTH++) {
+  #  $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
+  #}
 
   $STATE[-1]++;
 }
