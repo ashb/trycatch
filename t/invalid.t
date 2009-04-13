@@ -1,12 +1,14 @@
 use strict;
 use warnings;
 
-use Test::More tests => 10;
+use Test::More tests => 17;
 use Test::Exception;
 use TryCatch;
 
+my $line;
+
 test_for_error(
-  qr/^block required after try at .*? line 4$/, 
+  qr/^block required after try at .*? line (\d+)\b/, 
   "no block after try",
   <<'EOC' );
 use TryCatch;
@@ -15,31 +17,37 @@ sub foo { }
 try \&foo
 EOC
 
+is($line, 4, "Error from line 4");
 
 test_for_error(
-  qr/^block required after catch at \(eval \d+\) line 6$/,
+  qr/^block required after catch at \(eval \d+\) line (\d+)\b/,
   "no block after catch",
   <<'EOC');
 use TryCatch;
 
 try { 1 }
 catch 
+my $foo = 2;
 EOC
 
+is($line, 4, "Error from line 4");
 
 test_for_error(
-   qr/^Parameter expected near '\^' in '\^Err \$e' at \(eval \d+\) line 4$/,
+   qr/^Parameter expected near '\^' in '\^Err \$e' at \(eval \d+\) line (\d+)\b/,
    "invalid catch signature",
   <<'EOC');
+# line 1
 use TryCatch;
 
 try { }
 catch (^Err $e) {}
+next;
 EOC
 
+is($line, 4, "Error from line 4");
 
 test_for_error(
-  qr/^Run-away catch signature at \(eval \d+\) line 4/,
+  qr/^Run-away catch signature at \(eval \d+\) line (\d+)/,
   "invalid catch signature (missing parenthesis)",
   <<'EOC');
 use TryCatch;
@@ -54,10 +62,11 @@ catch (
 1;
 EOC
 
+is($line, 4, "Error from line 4");
 
 
 test_for_error(
-  qr/^Can't locate object method "bar" via package "catch" .*?at \(eval \d+\) line 3\b/,
+  qr/^Can't locate object method "bar" via package "catch" .*?at \(eval \d+\) line (\d+)\b/,
   "bareword between try and catch",
   <<'EOC');
 use TryCatch;
@@ -66,19 +75,21 @@ try { } bar
 catch {}
 
 EOC
+is($line, 3, "Error from line 3");
 
 test_for_error(
-  qr/^Bareword "catch" not allowed while "strict subs" in use at \(eval \d+\) line 3\b/,
+  qr/^Bareword "catch" not allowed while "strict subs" in use at \(eval \d+\) line (\d+)\b/,
   "catch is not special", 
   <<'EOC');
 use TryCatch;
 
 catch;
 EOC
+is($line, 3, "Error from line 3");
 
 
 test_for_error(
-  qr/^'SomeRandomTC' could not be parsed to a type constraint .*? at \(eval \d+\) line 4\b/,
+  qr/^'SomeRandomTC' could not be parsed to a type constraint .*? at \(eval \d+\) line (\d+)\b/,
   "Undefined TC",
   <<'EOC');
 use TryCatch;
@@ -87,6 +98,7 @@ try { }
 catch (SomeRandomTC $e) {}
 
 EOC
+is($line, 4, "Error from line 4");
 
 compile_ok("try is not too reserved", <<'EOC');
 use TryCatch;
@@ -103,6 +115,7 @@ use TryCatch;
 catch => 3;
 EOC
 
+local $TODO = 'Sort out POD';
 compile_ok("POD doesn't interfer with things.", <<'EOC');
 use TryCatch;
 
@@ -115,6 +128,7 @@ try {
 EOC
 
 sub test_for_error {
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
   my ($re, $msg, $code) = @_;
   try {
     eval $code;
@@ -123,10 +137,12 @@ sub test_for_error {
   }
   catch ($e) {
     like($e, $re, $msg);
+    ($line) = ($e =~ /$re/);
   }
 }
 
 sub compile_ok {
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
   my ($msg, $code) = @_;
   try {
     eval $code;
