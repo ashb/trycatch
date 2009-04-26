@@ -88,14 +88,15 @@ sub _parse_try {
 
   my $linestr = $ctx->get_linestr;
 
+  # Let "try =>" be valid.
+  return if substr($linestr, $ctx->offset, 2) eq '=>';
+
   # Shadow try to be a constant no-op sub
   $ctx->shadow(sub () { } );
 
   $ctx->inject_if_block(
     $ctx->injected_try_code . $ctx->scope_injector_call,
     q#;#
-    # TODO: unwinding
-    # q#; (sub #
   ) or croak "block required after try";
 
   #$ctx->debug_linestr("try");
@@ -115,8 +116,6 @@ sub injected_try_code {
   # ->
   # try; { local $@; eval { ...
 
-  #TODO: unwinding
-  #return 'local $@; local $TryCatch::CTX = Scope::Upper::HERE unless defined $TryCatch::CTX; eval {';
   return @STATE > 1
        ? 'local $TryCatch::CTX = Scope::Upper::HERE; eval {' # Nested case
        : 'local $@; eval {'
@@ -129,8 +128,6 @@ sub injected_after_try {
 
 sub injected_no_catch_code {
   return "};";
-  #TODO: unwinding
-  #return "})->();";
 }
 
 sub inject_scope {
@@ -159,7 +156,6 @@ sub block_postlude {
   if ($len = Devel::Declare::toke_scan_word($offset, 1 )) {
     $toke = substr( $linestr, $offset, $len );
     $ctx->{Declarator} = $toke;
-  } else {
   }
 
   if ($CHECK_OP_DEPTH && --$CHECK_OP_DEPTH == 0) {
@@ -176,15 +172,12 @@ sub block_postlude {
     my $code = $STATE[-1] == 0
              ? $ctx->injected_no_catch_code
              : '}}';
-             # TODO: unwinding
-             #: '}})->();';
 
     substr($linestr, $offset, 0, $code);
 
-    $ctx->debug_linestr("finalizer");
 
-    #$ctx->debug_linestr('block_postlude');
     $ctx->set_linestr($linestr);
+    $ctx->debug_linestr("finalizer");
 
     # This try/catch stmt is finished
     pop @STATE;
@@ -205,9 +198,11 @@ sub _parse_catch {
   local $Carp::Internal{'TryCatch'} = 1;
 
   # This isn't a normal DD-callback, so we can strip_name to get rid of try
+  my $offset = $ctx->offset;
   $ctx->strip_name;
   $ctx->skipspace;
-
+  my $new_offset = $ctx->offset;
+ 
   $ctx->debug_linestr('catch');
   my $linestr = $ctx->get_linestr;
 
