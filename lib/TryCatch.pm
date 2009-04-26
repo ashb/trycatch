@@ -11,10 +11,10 @@ use Devel::Declare::Context::Simple;
 use Parse::Method::Signatures;
 use Moose::Util::TypeConstraints;
 use Scope::Upper qw/localize unwind want_at :words/;
-use TryCatch::Exception;
 use Carp qw/croak/;
+use XSLoader;
 
-use base qw/DynaLoader Devel::Declare::Context::Simple/;
+use base qw/Devel::Declare::Context::Simple/;
 
 
 our $VERSION = '1.000003';
@@ -23,9 +23,7 @@ our $VERSION = '1.000003';
 our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH) = (undef, 0);
 our (@STATE);
 
-sub dl_load_flags { 0x01 }
-
-__PACKAGE__->bootstrap($VERSION);
+XSLoader::load(__PACKAGE__, $VERSION);
 
 use namespace::clean;
 

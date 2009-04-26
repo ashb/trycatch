@@ -20,11 +20,11 @@ requires 'MooseX::Types';
 requires 'Scope::Upper' => 0.06;
 requires 'Variable::Magic' => 0.28;
 requires 'Sub::Exporter' => 0.979;
+requires 'XSLoader';
 
 resources repository => 'http://github.com/ashb/trycatch/tree/master';
 
 auto_provides;
-jsonmeta();
 
 configure_requires 'ExtUtils::Depends';
 configure_requires 'B::Hooks::OP::Check' => 0.15;
@@ -63,7 +63,6 @@ makemaker_args(
 { no warnings 'once';
 if ($Module::Install::AUTHOR) {
   system('pod2text lib/TryCatch.pm > README');
-  system('cp META.yml META.json');
 
   # Pull in the header files from B::Hooks modules we need.
   # This only works since I know they only use .h files, not XS or typemaps.
