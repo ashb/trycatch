@@ -49,13 +49,8 @@ use Sub::Exporter -setup => {
 
 # The actual try call itself. Nothing to do with parsing.
 sub try () {
-  warn "non-shadowed";
+  warn "non-shadowed - shouldn't happen";
   return;
-  my ($sub) = @_;
-
-  Carp::cluck "I dont want to be called. fail";
-  return new TryCatch::Exception( try => $sub, ctx => SUB(CALLER(1)) );
-
 }
 
 # Where we store all the TCs for catch blocks created at compile time

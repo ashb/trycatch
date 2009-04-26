@@ -5,6 +5,7 @@ Version history for TryCatch perl module:
   - Make try 'less reserved' (i.e. so { try => 'foo' } works)
   - Internal refactoring to use Devel::Declare better
   - Switch to using XSLoader from DynaLoader
+  - Remove (now redundant) TryCatch::Exception
 
 1.000003 - 2009/04/21 - 10:37
   - Makefile.PL tweaks
