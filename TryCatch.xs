@@ -1,6 +1,8 @@
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
+#define NEED_sv_2pv_flags
+#include "ppport.h"
 
 #include "hook_op_check.h"
 #include "hook_op_ppaddr.h"
@@ -10,7 +12,6 @@ static int trycatch_debug = 0;
 STATIC I32
 dump_cxstack()
 {
-  //dVAR;
   I32 i;
   for (i = cxstack_ix; i >= 0; i--) {
     register const PERL_CONTEXT * const cx = cxstack+i;
@@ -59,17 +60,17 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   }
 
 
-  // call_pv("Scope::Upper::unwind", G_VOID);
-  // Can't use call_sv et al. since it resets PL_op.
+  /* Can't use call_sv et al. since it resets PL_op. */
+  /* call_pv("Scope::Upper::unwind", G_VOID); */
 
   unwind = get_cv("Scope::Upper::unwind", 0);
   XPUSHs( (SV*)unwind);
   PUTBACK;
 
-  return CALL_FPTR(PL_ppaddr[OP_ENTERSUB])(aTHX);
+  return CALL_FPTR(PL_ppaddr[OP_ENTERSUB])(aTHXR);
 }
 
-// Hook the OP_RETURN iff we are in hte same file as originally compiling.
+/* Hook the OP_RETURN iff we are in hte same file as originally compiling. */
 STATIC OP* check_return (pTHX_ OP *op, void *user_data) {
 
   const char* file = SvPV_nolen( (SV*)user_data );
@@ -87,7 +88,7 @@ PROTOTYPES: DISABLE
 void
 install_return_op_check()
   CODE:
-    // Code stole from Scalar::Util::dualvar
+    /* Code stole from Scalar::Util::dualvar */
     UV id;
     char* file = CopFILE(&PL_compiling);
     STRLEN len = strlen(file);
@@ -119,7 +120,6 @@ SV* id
     UV uiv = SvIV(id);
 #endif
     hook_op_check_remove(OP_RETURN, uiv);
-    //SvREFCNT_dec( id );
   OUTPUT:
 
 void dump_stack()
@@ -128,7 +128,9 @@ void dump_stack()
   OUTPUT:
 
 BOOT:
+{
   char *debug = getenv ("TRYCATCH_DEBUG");
   if (debug && atoi(debug) >= 2) {
     trycatch_debug = 1;
   }
+}
