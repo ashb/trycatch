@@ -27,9 +27,10 @@ is( nested_2(), "from nested_2", "call nested try");
 my $val;
 try {
     try { die "Foo" }
-    catch ($e) { die "$e\n" }
+    catch ($e) { die "$e" }
 }
 catch ($e) {
-    $val = "$e\n";
+    $val = "$e";
 } 
-like($val, qr/^Foo at line /, "Double nested try-catch behaves");
+like($val, qr/^Foo at t[\/\\]nested.t line /, 
+     "Nested try-catch in same function behaves");

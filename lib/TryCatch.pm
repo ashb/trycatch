@@ -67,7 +67,7 @@ sub check_tc {
 
 # From here on out its parsing methods.
 
-# Replace 'try {' with an 'try (sub {'
+# Replace 'try {' with an 'try; { local $@; eval {'
 sub _parse_try {
   my $pack = shift;
 
@@ -116,7 +116,7 @@ sub injected_try_code {
 
 sub injected_after_try {
   # This semicolon is for the end of the eval
-  return '; if ($@) { local $TryCatch::Error = $@;';
+  return ';$TryCatch::Error = $@; } if ($TryCatch::Error) { ';
 }
 
 sub injected_no_catch_code {
@@ -164,7 +164,7 @@ sub block_postlude {
   } else  {
     my $code = $STATE[-1] == 0
              ? $ctx->injected_no_catch_code
-             : '}}';
+             : '}';
 
     substr($linestr, $offset, 0, $code);
 
@@ -300,8 +300,10 @@ TryCatch - first class try catch semantics for Perl, without source filters.
  use TryCatch;
 
  sub foo {
+   my ($self) = @_;
+
    try {
-     # some code that might die
+     die Some::Class->new(code => 404 ) if $self->not_found;
      return "return value from foo";
    }
    catch (Some::Class $e where { $_->code > 100 } ) {
