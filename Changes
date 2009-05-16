@@ -1,7 +1,9 @@
 Version history for TryCatch perl module:
 
+1.001001 - 2009/05/16
   - Fix bug with nested try+die (Reported by Possum)
     As a result of this $@ will not have the value of the exception visible
+  - Fix compile issues on 5.8.6 by using ppport.h
 
 1.001000 - 2009/04/26 - 01:01
   - Fix bug where catch block would get run sometimes when it shouldn't
