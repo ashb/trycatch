@@ -21,6 +21,9 @@ our $VERSION = '1.001001';
 
 # These are private state variables. Mess with them at your peril
 our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH) = (undef, 0);
+
+# Stack of state for tacking nested. Each value is number of catch blocks at
+# the current level. We are nested if @STATE > 1
 our (@STATE);
 
 XSLoader::load(__PACKAGE__, $VERSION);
@@ -269,11 +272,11 @@ sub _parse_catch {
   $STATE[-1]++;
 }
 
-sub debug_linestr {
+*debug_linestr = !( ($ENV{TRYCATCH_DEBUG} || 0) & 1)
+               ? sub {}
+               : sub {
   my ($ctx, $message) = @_;
 
-  return unless $ENV{TRYCATCH_DEBUG};
- 
   local $Carp::Internal{'TryCatch'} = 1;
   local $Carp::Internal{'Devel::Declare'} = 1;
   local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
@@ -284,7 +287,7 @@ sub debug_linestr {
 
   warn   "  Substr: ", Devel::PartialDump::dump(substr($ctx->get_linestr, $ctx->offset)),
        "\n  Whole:  ", Devel::PartialDump::dump($ctx->get_linestr), "\n\n";
-}
+};
 
 
 1;
@@ -379,22 +382,6 @@ Decide on C<finally> semantics w.r.t return values.
 Write some more documentation
 
 =back
-
-=head1 KNOWN BUGS
-
-Currently C<@_> is not accessible inside try or catch blocks, so assign this to
-a lexical variable outside if you wish to access function arguments. i.e.: 
-
- sub foo {
-   try { return $_[0] };
- }
-
-will not work, instead you must do something similar to this:
-
- sub foo {
-   my ($foo) = @_;
-   try { return $foo }
- }
 
 =head1 SEE ALSO
 

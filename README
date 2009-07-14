@@ -77,22 +77,6 @@ TODO
 
     *   Write some more documentation
 
-KNOWN BUGS
-    Currently @_ is not accessible inside try or catch blocks, so assign
-    this to a lexical variable outside if you wish to access function
-    arguments. i.e.:
-
-     sub foo {
-       try { return $_[0] };
-     }
-
-    will not work, instead you must do something similar to this:
-
-     sub foo {
-       my ($foo) = @_;
-       try { return $foo }
-     }
-
 SEE ALSO
     MooseX::Types, Moose::Util::TypeConstraints, Parse::Method::Signatures.
 

@@ -130,7 +130,7 @@ void dump_stack()
 BOOT:
 {
   char *debug = getenv ("TRYCATCH_DEBUG");
-  if (debug && atoi(debug) >= 2) {
+  if (debug && (atoi(debug) & 2)) {
     trycatch_debug = 1;
   }
 }
