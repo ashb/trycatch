@@ -91,12 +91,13 @@ sub _parse_try {
   $ctx->shadow(sub () { } );
 
   $ctx->inject_if_block(
-    $ctx->injected_try_code . $ctx->scope_injector_call,
+    $ctx->injected_try_code . $ctx->scope_injector_call('{}'),
     q#;#
   ) or croak "block required after try";
 
   #$ctx->debug_linestr("try");
-  if (! $CHECK_OP_DEPTH++) {
+  if (! $CHECK_OP_DEPTH) {
+    $CHECK_OP_DEPTH++;
     $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
   }
 
@@ -126,7 +127,28 @@ sub injected_no_catch_code {
   return "};";
 }
 
+sub injected_post_catch_code {
+  return 'else { die $TryCatch::Error } }';
+}
+
+
+sub scope_injector_call {
+  my $self = shift;
+  my $inject = shift;
+  return ' BEGIN { ' . ref($self) . "->inject_scope(${inject}) }; ";
+}
+
+
 sub inject_scope {
+  my ($class, $opts) = @_;
+
+  if ($opts->{hook}) {
+    if (! $CHECK_OP_DEPTH) {
+      $CHECK_OP_DEPTH++;
+      $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
+    }
+  }
+
   on_scope_end { 
     block_postlude() 
   }
@@ -156,6 +178,7 @@ sub block_postlude {
 
   if ($CHECK_OP_DEPTH && --$CHECK_OP_DEPTH == 0) {
     TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
+    $CHECK_OP_HOOK = '';
   }
 
   if ($toke eq 'catch') {
@@ -167,7 +190,7 @@ sub block_postlude {
   } else  {
     my $code = $STATE[-1] == 0
              ? $ctx->injected_no_catch_code
-             : '}';
+             : $ctx->injected_post_catch_code;
 
     substr($linestr, $offset, 0, $code);
 
@@ -186,7 +209,6 @@ sub block_postlude {
 sub _parse_catch {
   my $ctx = shift;
   my $pack = $ctx->get_curstash_name;
-
 
   # Hide Devel::Declare from carp;
   local $Carp::Internal{'Devel::Declare'} = 1;
@@ -258,16 +280,16 @@ sub _parse_catch {
          ? "if ("
          : "elsif (";
 
+  $var_code = $ctx->scope_injector_call( 
+                  @STATE > 1 ? '{hook => 1}' : '{}'
+              ) . $var_code;
+
   $ctx->inject_if_block(
-    $ctx->scope_injector_call . $var_code,
+    $var_code,
     $code . join(' && ', @conditions) . ')'
   ) or croak "block required after catch";
 
   $ctx->debug_linestr('post catch');
-
-  #if (! $CHECK_OP_DEPTH++) {
-  #  $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
-  #}
 
   $STATE[-1]++;
 }

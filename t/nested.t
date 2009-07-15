@@ -1,8 +1,8 @@
 use strict;
 use warnings;
-use Test::More tests => 6;
+use Test::More tests => 5;
 
-BEGIN { use_ok "TryCatch" or BAIL_OUT("Cannot load TryCatch") };
+use TryCatch;
 
 sub nested_1 {
   try {
@@ -31,14 +31,14 @@ sub nested_catch {
         die "Some str\n";
       }
       catch ( $e ) {        
-        return "caught in nested TC";
+        return "return from nested catch";
       }
   }
   
   return "didn't catch";
 }
 
-is( nested_catch(), "caught in nested TC", "nested catch" );
+is( nested_catch(), "return from nested catch", "nested catch" );
 
 my $val;
 try {
@@ -51,8 +51,6 @@ catch ($e) {
 like($val, qr/^Foo at t[\/\\]nested.t line /, 
      "Nested try-catch in same function behaves");
 
-
-# frif: uncatched exceptions should be rethrown
 sub nested_rethrow {
   try {      
       try {

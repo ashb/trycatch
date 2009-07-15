@@ -42,19 +42,18 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
     XPUSHs( ctx );
     PUTBACK;
   } else {
-    if (trycatch_debug) {
-      printf("No ctx, making it up\n");
-    }
     PUSHMARK(SP);
     PUTBACK;
 
-    call_pv("Scope::Upper::UP", G_SCALAR);
+    call_pv("Scope::Upper::SUB", G_SCALAR);
+    if (trycatch_debug) {
+      printf("No ctx, making it up\n");
+    }
 
     SPAGAIN;
   }
 
   if (trycatch_debug) {
-    dump_cxstack();
     printf("unwinding to %d\n", (int)SvIV(*sp));
 
   }
@@ -77,6 +76,10 @@ STATIC OP* check_return (pTHX_ OP *op, void *user_data) {
   const char* cur_file = CopFILE(&PL_compiling);
   if (strcmp(file, cur_file))
     return op;
+  if (trycatch_debug) {
+    printf("hooking OP_return at %s:%d\n", file, CopLINE(&PL_compiling));
+  }
+
   hook_op_ppaddr(op, unwind_return, NULL);
   return op;
 }
@@ -131,6 +134,7 @@ BOOT:
 {
   char *debug = getenv ("TRYCATCH_DEBUG");
   if (debug && (atoi(debug) & 2)) {
+    printf("TryCatch XS debug enabled\n");
     trycatch_debug = 1;
   }
 }
