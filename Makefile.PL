@@ -9,11 +9,19 @@ perl_version '5.008001';
 name 'TryCatch';
 all_from 'lib/TryCatch.pm';
 
-requires 'Parse::Method::Signatures' => '1.003003';
-requires 'B::Hooks::EndOfScope' => 0.05;
-requires 'B::Hooks::OP::Check' => 0.15;
-requires 'B::Hooks::OP::PPAddr' => 0.02;
-requires 'Devel::Declare' => '0.003004';
+my %config_deps = (
+  'ExtUtils::Depends' => 0.302,
+);
+# These are config and runtime deps
+my %run_deps = (
+  'B::Hooks::OP::Check' => 0.18,
+  'B::Hooks::OP::PPAddr' => 0.03,
+);
+
+requires %run_deps;
+requires 'Parse::Method::Signatures' => '1.003009';
+requires 'B::Hooks::EndOfScope' => 0.08;
+requires 'Devel::Declare' => '0.005007';
 requires 'Moose';
 requires 'MooseX::Types::Moose';
 requires 'MooseX::Types';
@@ -26,23 +34,19 @@ resources repository => 'http://github.com/ashb/trycatch/tree/master';
 
 auto_provides;
 
-configure_requires 'ExtUtils::Depends';
-configure_requires 'B::Hooks::OP::Check' => 0.15;
-configure_requires 'B::Hooks::OP::PPAddr' => 0.02;
+configure_requires %config_deps, %run_deps;
 my $ok = 1;
 
 # Does the toolchain support configure_requires
 # If yes, it should be here already.
 can_use('ExtUtils::Depends') or do {
   warn "***\n* Your CPAN toolchain is out of date. Please upgrade it\n***\n"; sleep 5;
-  requires 'ExtUtils::Depends';
-  requires 'B::Hooks::OP::Check' => 0.15;
-  requires 'B::Hooks::OP::PPAddr' => 0.02;
+  requires %config_deps;
   
 };
 
-# Currently CPAN client dont seem to get on with JSON meta, so always use our 
-# version from inc/EUDeps
+# Since we can bundle things under inc, do so. That way it should be easier to
+# install
 unshift @INC, "$Bin/inc/EUDeps";
 can_use('ExtUtils::Depends') or do {
   warn "ExtUtils::Depends not installed and can't use version from inc!";
