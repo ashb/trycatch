@@ -9,6 +9,10 @@ perl_version '5.008001';
 name 'TryCatch';
 all_from 'lib/TryCatch.pm';
 
+
+test_requires 'Test::More' => 0.88;
+test_requires 'Test::Exception';
+
 my %config_deps = (
   'ExtUtils::Depends' => 0.302,
 );

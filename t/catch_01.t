@@ -1,6 +1,7 @@
 use strict;
 use warnings;
-use Test::More tests => 7;
+use Test::More;
+use Test::Exception;
 
 BEGIN { use_ok "TryCatch" or BAIL_OUT("Cannot load TryCatch") };
 
@@ -71,4 +72,43 @@ sub catch_args {
 
 is(catch_args([1,2,3]), "Got an array of 1 2 3", "simple_catch_type");
 is(catch_args(''), "Got otherwise", "simple_catch_type");
+
+
+# Testing of how errors propogate when not caught
+dies_ok {
+  try {
+    die { code => 500 };
+  }
+  catch ($e where {$_->{code} < 400} ) {
+    pass("caught error")
+  }
+} "No catch-all causes error to propogate";
+
+
+lives_ok {
+  try {
+    die { code => 500 };
+  }
+  catch ($e where {$_->{code} < 400} ) {
+    fail("caught error when we shouldn't have")
+  }
+  catch {
+    pass("Caught error in catch all");
+  }
+} "Catch-all doesn't cause error to propogate";
+
+
+dies_ok {
+  try {
+    try {
+      die { code => 500 };
+    }
+    catch { die }
+  }
+  catch ($e where {$_->{code} < 400} ) {
+    fail("caught error when we shouldn't have")
+  }
+} "'die' propogates errors as expected";
+
+done_testing();
 
