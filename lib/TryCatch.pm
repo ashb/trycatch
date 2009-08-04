@@ -52,7 +52,6 @@ use Sub::Exporter -setup => {
 
 # The actual try call itself. Nothing to do with parsing.
 sub try () {
-  warn "non-shadowed - shouldn't happen";
   return;
 }
 
@@ -128,7 +127,8 @@ sub injected_no_catch_code {
 }
 
 sub injected_post_catch_code {
-  return 'else { die $TryCatch::Error } }';
+  # We do it like this so that PROPGATE gets called, in case anyone is using it
+  return 'else { $@ = $TryCatch::Error; die } }';
 }
 
 
@@ -215,7 +215,7 @@ sub _parse_catch {
   local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
   local $Carp::Internal{'TryCatch'} = 1;
 
-  # This isn't a normal DD-callback, so we can strip_name to get rid of try
+  # This isn't a normal DD-callback, so we can strip_name to get rid of 'catch'
   my $offset = $ctx->offset;
   $ctx->strip_name;
   $ctx->skipspace;
