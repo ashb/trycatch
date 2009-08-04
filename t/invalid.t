@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 17;
+use Test::More;
 use Test::Exception;
 use TryCatch;
 
@@ -30,8 +30,7 @@ catch
 my $foo = 2;
 EOC
 
-$TODO = "Devel::Declare line number issue";
-is($line, 4, "Error from line 4");
+is($line, 5, "Error from line 5");
 
 test_for_error(
    qr/^Parameter expected near '\^' in '\^Err \$e' at \(eval \d+\) line (\d+)\b/,
@@ -76,7 +75,6 @@ try { } bar
 catch {}
 
 EOC
-undef $TODO;
 is($line, 3, "Error from line 3");
 
 test_for_error(
@@ -101,10 +99,7 @@ catch (SomeRandomTC $e) {}
 
 EOC
 
-{
-local $TODO = "Devel::Declare line number issue";
 is($line, 4, "Error from line 4");
-}
 
 compile_ok("try is not too reserved", <<'EOC');
 use TryCatch;
@@ -121,6 +116,7 @@ use TryCatch;
 catch => 3;
 EOC
 
+{
 local $TODO = 'Sort out POD';
 compile_ok("POD doesn't interfer with things.", <<'EOC');
 use TryCatch;
@@ -132,6 +128,9 @@ try {
 
 =cut
 EOC
+}
+
+done_testing;
 
 sub test_for_error {
   local $Test::Builder::Level = $Test::Builder::Level + 1;
