@@ -58,6 +58,7 @@ can_use('ExtUtils::Depends') or do {
 
 
 unless ($ok) {
+  auto_install;
   WriteAll;
   exit 1;
 }
@@ -92,6 +93,7 @@ if ($Module::Install::AUTHOR) {
 }
 }
 
+auto_install;
 WriteAll;
 
 
