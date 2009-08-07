@@ -103,16 +103,17 @@ sub _parse_try {
   $ctx->debug_linestr('post try');
 
   # Number of catch blocks found, we only care about 0,1 and +1 cases tho
-  push @STATE, 0;
+  $ctx->state_new_block();
   
 }
+
 
 sub injected_try_code {
   # try { ...
   # ->
   # try; { local $@; eval { ...
 
-  return @STATE > 1
+  return $_[0]->state_is_nested()
        ? 'local $TryCatch::CTX = Scope::Upper::HERE; eval {' # Nested case
        : 'local $@; eval {'
 }
@@ -188,9 +189,9 @@ sub block_postlude {
     $ctx->_parse_catch;
 
   } else  {
-    my $code = $STATE[-1] == 0
-             ? $ctx->injected_no_catch_code
-             : $ctx->injected_post_catch_code;
+    my $code = $ctx->state_have_catch_block()
+             ? $ctx->injected_post_catch_code
+             : $ctx->injected_no_catch_code;
 
     substr($linestr, $offset, 0, $code);
 
@@ -199,7 +200,7 @@ sub block_postlude {
     $ctx->debug_linestr("finalizer");
 
     # This try/catch stmt is finished
-    pop @STATE;
+    $ctx->state_end_block();
   }
 }
 
@@ -208,7 +209,6 @@ sub block_postlude {
 # the '->' is added by one of the postlude hooks
 sub _parse_catch {
   my $ctx = shift;
-  my $pack = $ctx->get_curstash_name;
 
   # Hide Devel::Declare from carp;
   local $Carp::Internal{'Devel::Declare'} = 1;
@@ -219,70 +219,30 @@ sub _parse_catch {
   my $offset = $ctx->offset;
   $ctx->strip_name;
   $ctx->skipspace;
-  my $new_offset = $ctx->offset;
  
   $ctx->debug_linestr('catch');
   my $linestr = $ctx->get_linestr;
 
-  my $code;
-  my $var_code = "";
+  my ($code, $var_code, @conditions) = ("","");
 
-  my @conditions;
   # optional ()
   if (substr($linestr, $ctx->offset, 1) eq '(') {
-    my $proto = $ctx->strip_proto;
-    croak "Run-away catch signature"
-      unless (length $proto);
-    
-    my $sig = Parse::Method::Signatures->new(
-      input => $proto,
-      from_namespace => $pack,
-    );
-    my $errctx = $sig->ppi;
-    my $param = $sig->param;
-
-    $sig->error( $errctx, "Parameter expected")
-      unless $param;
-
-    my $left = $sig->remaining_input;
-
-    croak "TryCatch can't handle un-named vars in catch signature" 
-      unless $param->can('variable_name');
-
-    my $name = $param->variable_name;
-    $var_code = "my $name = \$TryCatch::Error;";
-
-    # (TC $var)
-    if ($param->has_type_constraints) {
-      my $tc = $param->meta_type_constraint;
-      $TC_LIBRARY->{"$tc"} = $tc;
-      push @conditions, "TryCatch->check_tc('$tc')";
-    }
-
-    # ($var where { $_ } )
-    if ($param->has_constraints) {
-      foreach my $con (@{$param->constraints}) {
-        $con =~ s/^{|}$//g;
-        push @conditions, "do {local \$_ = \$TryCatch::Error; $con }";
-      }
-    }
-
-    $linestr = $ctx->get_linestr;
+    ($var_code, @conditions) = $ctx->parse_proto()
   }
 
-  $code = $ctx->injected_after_try
-    if $STATE[-1] == 0;
+  @conditions = ('1') unless @conditions;
 
-  @conditions = ('1')
-    unless @conditions;
-
-  $code .= $STATE[-1] < 1
-         ? "if ("
-         : "elsif (";
+  unless ($ctx->state_have_catch_block()) {
+    $code = $ctx->injected_after_try
+          . "if (";
+  }
+  else {
+    $code = "elsif (";
+  }
 
   $var_code = $ctx->scope_injector_call( 
-                  @STATE > 1 ? '{hook => 1}' : '{}'
-              ) . $var_code;
+    $ctx->state_is_nested() ? '{hook => 1}' : '{}'
+  ) . $var_code;
 
   $ctx->inject_if_block(
     $var_code,
@@ -291,6 +251,80 @@ sub _parse_catch {
 
   $ctx->debug_linestr('post catch');
 
+  $ctx->state_parsed_catch();
+}
+
+sub parse_proto {
+  my ($self) = @_;
+
+  my $proto = $self->strip_proto;
+  croak "Run-away catch signature"
+    unless (length $proto);
+
+  return $self->parse_proto_using_pms($proto);
+}
+
+sub parse_proto_using_pms {
+  my ($self, $proto) = @_;
+
+  my @conditions;
+
+  my $sig = Parse::Method::Signatures->new(
+    input => $proto,
+    from_namespace => $self->get_curstash_name,
+  );
+  my $errctx = $sig->ppi;
+  my $param = $sig->param;
+
+  $sig->error( $errctx, "Parameter expected")
+    unless $param;
+
+  my $left = $sig->remaining_input;
+
+  croak "TryCatch can't handle un-named vars in catch signature"
+    unless $param->can('variable_name');
+
+  my $name = $param->variable_name;
+  my $var_code = "my $name = \$TryCatch::Error;";
+
+  # (TC $var)
+  if ($param->has_type_constraints) {
+    my $tc = $param->meta_type_constraint;
+    $TC_LIBRARY->{"$tc"} = $tc;
+    push @conditions, "TryCatch->check_tc('$tc')";
+  }
+
+  # ($var where { $_ } )
+  if ($param->has_constraints) {
+    foreach my $con (@{$param->constraints}) {
+      $con =~ s/^{|}$//g;
+      push @conditions, "do {local \$_ = \$TryCatch::Error; $con }";
+    }
+  }
+
+  return $var_code, @conditions;
+}
+
+# Functions that wrap @STATE maniuplation into useful names
+sub state_new_block {
+  push @STATE, 0;
+  return
+}
+
+sub state_end_block {
+  pop @STATE;
+  return;
+}
+
+sub state_is_nested {
+  return @STATE > 1;
+}
+
+sub state_have_catch_block {
+  return $STATE[-1] > 0;
+}
+
+sub state_parsed_catch {
   $STATE[-1]++;
 }
 
