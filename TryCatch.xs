@@ -19,10 +19,13 @@ dump_cxstack()
     default:
         continue;
     case CXt_EVAL:
-    case CXt_FORMAT:
+        printf("***\n* cx stack %d\n", (int)i);
+        sv_dump((SV*)cx->blk_eval.cv);
+        break;
     case CXt_SUB:
         printf("***\n* cx stack %d\n", (int)i);
         sv_dump((SV*)cx->blk_sub.cv);
+        break;
     }
   }
   return i;
