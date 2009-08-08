@@ -49,14 +49,14 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
     PUTBACK;
 
     call_pv("Scope::Upper::SUB", G_SCALAR);
-    if (trycatch_debug) {
+    if (trycatch_debug & 1) {
       printf("No ctx, making it up\n");
     }
 
     SPAGAIN;
   }
 
-  if (trycatch_debug) {
+  if (trycatch_debug & 1) {
     printf("unwinding to %d\n", (int)SvIV(*sp));
 
   }
@@ -79,7 +79,7 @@ STATIC OP* check_return (pTHX_ OP *op, void *user_data) {
   const char* cur_file = CopFILE(&PL_compiling);
   if (strcmp(file, cur_file))
     return op;
-  if (trycatch_debug) {
+  if (trycatch_debug & 1) {
     printf("hooking OP_return at %s:%d\n", file, CopLINE(&PL_compiling));
   }
 
@@ -136,8 +136,9 @@ void dump_stack()
 BOOT:
 {
   char *debug = getenv ("TRYCATCH_DEBUG");
-  if (debug && (atoi(debug) & 2)) {
-    printf("TryCatch XS debug enabled\n");
-    trycatch_debug = 1;
+  int lvl = 0;
+  if (debug && (lvl = atoi(debug)) && (lvl & (~1)) ) {
+    trycatch_debug = lvl >> 1;
+    printf("TryCatch XS debug enabled: %d\n", trycatch_debug);
   }
 }
