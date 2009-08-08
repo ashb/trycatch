@@ -63,7 +63,7 @@ unless ($ok) {
   exit 1;
 }
 
-my $pkg = ExtUtils::Depends->new('TryCatch', 'B::Hooks::OP::PPAddr', 'B::Hooks::OP::Check');
+my $pkg = ExtUtils::Depends->new('TryCatch',  keys %run_deps);
 makemaker_args(
     $pkg->get_makefile_vars,
 );
