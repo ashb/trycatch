@@ -354,6 +354,14 @@ __END__
 
 TryCatch - first class try catch semantics for Perl, without source filters.
 
+=head1 DESCRIPTION
+
+This module aims to provide a nicer syntax and method to catch errors in Perl,
+similar to what is found in other languages (such as Java, Python or C++).  The
+standard method of using C<< eval {}; if ($@) {} >> is often prone to subtle
+bugs, primarily that its far too easy to stomp on the error in error handlers.
+And also eval/if isn't the nicest idiom.
+
 =head1 SYNOPSIS
 
  use TryCatch;
