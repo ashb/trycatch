@@ -87,6 +87,38 @@ STATIC OP* check_return (pTHX_ OP *op, void *user_data) {
   return op;
 }
 
+
+
+void dualvar_id(SV* sv, UV id) {
+
+  char* file = CopFILE(&PL_compiling);
+  STRLEN len = strlen(file);
+
+  (void)SvUPGRADE(sv,SVt_PVNV);
+
+  sv_setpvn(sv,file,len);
+#ifdef SVf_IVisUV
+  SvUV_set(sv, id);
+  SvIOK_on(sv);
+  SvIsUV_on(sv);
+#else
+  SvIV_set(sv, id);
+  SvIOK_on(sv);
+#endif
+}
+
+SV* install_op_check(int op_code, hook_op_ppaddr_cb_t hook_fn) {
+  SV* ret;
+  UV id;
+
+  ret = newSV(0);
+
+  id = hook_op_check( op_code, hook_fn, ret );
+  dualvar_id(ret, id);
+
+  return ret;
+}
+
 MODULE = TryCatch PACKAGE = TryCatch::XS
 
 PROTOTYPES: DISABLE
@@ -94,26 +126,7 @@ PROTOTYPES: DISABLE
 void
 install_return_op_check()
   CODE:
-    /* Code stole from Scalar::Util::dualvar */
-    UV id;
-    char* file = CopFILE(&PL_compiling);
-    STRLEN len = strlen(file);
-
-    ST(0) = newSV(0);
-
-    (void)SvUPGRADE(ST(0),SVt_PVNV);
-    sv_setpvn(ST(0),file,len);
-
-    id = hook_op_check( OP_RETURN, check_return, ST(0) );
-#ifdef SVf_IVisUV
-    SvUV_set(ST(0), id);
-    SvIOK_on(ST(0));
-    SvIsUV_on(ST(0));
-#else
-    SvIV_set(ST(0), id);
-    SvIOK_on(ST(0));
-#endif
-
+    ST(0) = install_op_check(OP_RETURN, check_return);
     XSRETURN(1);
 
 void
