@@ -60,6 +60,9 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   if (ctx) {
     XPUSHs( ctx );
     PUTBACK;
+    if (trycatch_debug & 1) {
+      printf("have a $CTX of %d\n", SvIV(ctx));
+    }
   } else {
     PUSHMARK(SP);
     PUTBACK;
@@ -113,10 +116,13 @@ STATIC OP* check_return (pTHX_ OP *op, void *user_data) {
 
   const char* file = SvPV_nolen( (SV*)user_data );
   const char* cur_file = CopFILE(&PL_compiling);
-  if (strcmp(file, cur_file))
+  if (strcmp(file, cur_file)) {
+    if (trycatch_debug & 4)
+      Perl_warn(aTHX_ "Not hooking OP_return since its in '%s'", cur_file);
     return op;
+  }
   if (trycatch_debug & 1) {
-    printf("hooking OP_return at %s:%d\n", file, CopLINE(&PL_compiling));
+    Perl_warn(aTHX_ "hooking OP_return");
   }
 
   hook_op_ppaddr(op, unwind_return, NULL);
@@ -137,8 +143,7 @@ STATIC OP* check_leavetry (pTHX_ OP *op, void *user_data) {
     if (trycatch_debug & 2) {
       const char* cur_file = CopFILE(&PL_compiling);
       int is_try = SvIVx(eval_is_try);
-      printf("enterytry op 0x%x try=%d at %s:%d\n",
-             op, is_try, cur_file, CopLINE(PL_curcop) );
+      Perl_warn(aTHX_ "entertry op 0x%x try=%d", op, is_try);
     }
 
     SvIV_set(eval_is_try, 0);

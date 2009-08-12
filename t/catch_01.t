@@ -9,8 +9,8 @@ sub simple_no_die {
   try {
     return "simple_return";
        } # foo
-  catch {
-    die "Shouldn't get here\n";
+  catch($e) {
+    die "Shouldn't get here: $e";
   }
 
   diag("foo\n");
