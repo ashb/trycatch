@@ -98,7 +98,9 @@ STATIC OP* op_after_entertry(pTHX_ OP *op, void *user_data) {
 
   // Sanity check the gimme, since we'll reset it in leavetry
   if (cx->blk_gimme != G_VOID) {
-    Perl_croak(aTHX_ "Try Catch Internal Error: ENTERTRY op did not have VOID context (it was %d)", cx->blk_gimme);
+    fprintf(stderr, "Try Catch Internal Error: ENTERTRY op did not have "
+                    "VOID context (it was %d)\n", cx->blk_gimme);
+    abort();
   }
   cx->blk_gimme = get_sub_context();
   return op;

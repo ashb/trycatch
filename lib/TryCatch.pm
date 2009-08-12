@@ -128,12 +128,14 @@ sub injected_after_try {
 }
 
 sub injected_no_catch_code {
-  return "};";
+  # This undef is to ensure that there is the eval{}; is called in void context
+  # i.e that its not the last op in a subroutine
+  return "};undef;";
 }
 
 sub injected_post_catch_code {
   # We do it like this so that PROPGATE gets called, in case anyone is using it
-  return 'else { $@ = $TryCatch::Error; die } }';
+  return 'else { $@ = $TryCatch::Error; die } };undef;';
 }
 
 
