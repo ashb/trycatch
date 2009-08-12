@@ -21,6 +21,7 @@ our $VERSION = '1.001001';
 
 # These are private state variables. Mess with them at your peril
 our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH) = (undef, 0);
+our $NEXT_EVAL_IS_TRY;
 
 # Stack of state for tacking nested. Each value is number of catch blocks at
 # the current level. We are nested if @STATE > 1
@@ -36,6 +37,9 @@ use Sub::Exporter -setup => {
   installer => sub {
     my ($args, $to_export) = @_;
     my $pack = $args->{into};
+
+    TryCatch::XS::install_try_op_check();
+
     foreach my $name (@$to_export) {
       if (my $parser = __PACKAGE__->can("_parse_${name}")) {
         Devel::Declare->setup_for(
@@ -189,9 +193,16 @@ sub block_postlude {
     $ctx->_parse_catch;
 
   } else  {
-    my $code = $ctx->state_have_catch_block()
-             ? $ctx->injected_post_catch_code
-             : $ctx->injected_no_catch_code;
+
+    # No (more) catch blocks, so write the postlude
+    my $code;
+    if ($ctx->state_have_catch_block) {
+      $code = $ctx->injected_post_catch_code;
+    }
+    else {
+      $code = $ctx->injected_no_catch_code;
+      $NEXT_EVAL_IS_TRY = 1;
+    }
 
     substr($linestr, $offset, 0, $code);
 
@@ -233,6 +244,7 @@ sub _parse_catch {
   @conditions = ('1') unless @conditions;
 
   unless ($ctx->state_have_catch_block()) {
+    $NEXT_EVAL_IS_TRY = 1;
     $code = $ctx->injected_after_try
           . "if (";
   }

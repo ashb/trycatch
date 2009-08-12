@@ -12,13 +12,11 @@ sub fun {
 
     $last_context = wantarray;
   }
-  catch ($e) {
+  catch ($e where { /^1/ }) {
     $last_context = wantarray;
   }
 }
 
-{
-local $TODO = "Fix want-array contexts";
 my @v;
 $v[0] = fun();
 is($last_context, '', "Scalar try context preserved");
@@ -28,9 +26,7 @@ is($last_context, 1, "Array try context preserved");
 
 fun();
 is($last_context, undef, "void try context preserved");
-}
 
-my @v;
 $v[0] = fun(1);
 is($last_context, '', "Scalar catch context preserved");
 
