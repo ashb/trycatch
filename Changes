@@ -1,5 +1,6 @@
 Version history for TryCatch perl module:
 
+1.001001_99 - 2009/08/17
   - Fix a few bugs with nested try statements (return and errors not falling
     through as expected)
   - Fix wantarray context of try blocks.
