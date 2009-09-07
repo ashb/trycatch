@@ -37,6 +37,7 @@ use Sub::Exporter -setup => {
   installer => sub {
     my ($args, $to_export) = @_;
     my $pack = $args->{into};
+    my $ctx_class = $args->{parser} || 'TryCatch';
 
     TryCatch::XS::install_try_op_check();
 
@@ -44,7 +45,7 @@ use Sub::Exporter -setup => {
       if (my $parser = __PACKAGE__->can("_parse_${name}")) {
         Devel::Declare->setup_for(
           $pack,
-          { $name => { const => sub { $parser->($pack, @_) } } },
+          { $name => { const => sub { $ctx_class->$parser($pack, @_) } } },
         );
       }
     }
@@ -75,12 +76,12 @@ sub check_tc {
 
 # Replace 'try {' with an 'try; { local $@; eval {'
 sub _parse_try {
-  my $pack = shift;
+  my ($class,$pack, @args) = @_;
 
   # Hide Devel::Declare from carp;
   local $Carp::Internal{'Devel::Declare'} = 1;
 
-  my $ctx = TryCatch->new->init(@_);
+  my $ctx = $class->new->init(@args);
 
   $ctx->skip_declarator;
   $ctx->skipspace;
@@ -99,9 +100,9 @@ sub _parse_try {
   ) or croak "block required after try";
 
   #$ctx->debug_linestr("try");
-  if (! $CHECK_OP_DEPTH) {
-    $CHECK_OP_DEPTH++;
-    $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
+  if (! $TryCatch::CHECK_OP_DEPTH) {
+    $TryCatch::CHECK_OP_DEPTH++;
+    $TryCatch::CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
   }
 
   $ctx->debug_linestr('post try');
@@ -150,14 +151,14 @@ sub inject_scope {
   my ($class, $opts) = @_;
 
   if ($opts->{hook}) {
-    if (! $CHECK_OP_DEPTH) {
-      $CHECK_OP_DEPTH++;
-      $CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
+    if (! $TryCatch::CHECK_OP_DEPTH) {
+      $TryCatch::CHECK_OP_DEPTH++;
+      $TryCatch::CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
     }
   }
 
   on_scope_end { 
-    block_postlude() 
+    $class->block_postlude() 
   }
 }
 
@@ -165,7 +166,8 @@ sub inject_scope {
 # Look ahead and determine what action to take based on wether or note we
 # see a 'catch' token after the block
 sub block_postlude {
-  my $ctx = TryCatch->new->init(
+  my ($class) = @_;
+  my $ctx = $class->new->init(
     '', 
     Devel::Declare::get_linestr_offset()
   );
@@ -183,9 +185,9 @@ sub block_postlude {
     $ctx->{Declarator} = $toke;
   }
 
-  if ($CHECK_OP_DEPTH && --$CHECK_OP_DEPTH == 0) {
-    TryCatch::XS::uninstall_return_op_check($CHECK_OP_HOOK);
-    $CHECK_OP_HOOK = '';
+  if ($TryCatch::CHECK_OP_DEPTH && --$TryCatch::CHECK_OP_DEPTH == 0) {
+    TryCatch::XS::uninstall_return_op_check($TryCatch::CHECK_OP_HOOK);
+    $TryCatch::CHECK_OP_HOOK = '';
   }
 
   if ($toke eq 'catch') {
@@ -203,7 +205,7 @@ sub block_postlude {
     }
     else {
       $code = $ctx->injected_no_catch_code;
-      $NEXT_EVAL_IS_TRY = 1;
+      $TryCatch::NEXT_EVAL_IS_TRY = 1;
     }
 
     substr($linestr, $offset, 0, $code);
@@ -227,6 +229,7 @@ sub _parse_catch {
   local $Carp::Internal{'Devel::Declare'} = 1;
   local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
   local $Carp::Internal{'TryCatch'} = 1;
+  local $Carp::Internal{'TryCatch::Basic'} = 1;
 
   # This isn't a normal DD-callback, so we can strip_name to get rid of 'catch'
   my $offset = $ctx->offset;
@@ -246,7 +249,7 @@ sub _parse_catch {
   @conditions = ('1') unless @conditions;
 
   unless ($ctx->state_have_catch_block()) {
-    $NEXT_EVAL_IS_TRY = 1;
+    $TryCatch::NEXT_EVAL_IS_TRY = 1;
     $code = $ctx->injected_after_try
           . "if (";
   }
@@ -304,7 +307,7 @@ sub parse_proto_using_pms {
   # (TC $var)
   if ($param->has_type_constraints) {
     my $tc = $param->meta_type_constraint;
-    $TC_LIBRARY->{"$tc"} = $tc;
+    $TryCatch::TC_LIBRARY->{"$tc"} = $tc;
     push @conditions, "TryCatch->check_tc('$tc')";
   }
 
@@ -321,25 +324,25 @@ sub parse_proto_using_pms {
 
 # Functions that wrap @STATE maniuplation into useful names
 sub state_new_block {
-  push @STATE, 0;
+  push @TryCatch::STATE, 0;
   return
 }
 
 sub state_end_block {
-  pop @STATE;
+  pop @TryCatch::STATE;
   return;
 }
 
 sub state_is_nested {
-  return @STATE > 1;
+  return @TryCatch::STATE > 1;
 }
 
 sub state_have_catch_block {
-  return $STATE[-1] > 0;
+  return $TryCatch::STATE[-1] > 0;
 }
 
 sub state_parsed_catch {
-  $STATE[-1]++;
+  $TryCatch::STATE[-1]++;
 }
 
 *debug_linestr = !( ($ENV{TRYCATCH_DEBUG} || 0) & 1)
@@ -348,6 +351,7 @@ sub state_parsed_catch {
   my ($ctx, $message) = @_;
 
   local $Carp::Internal{'TryCatch'} = 1;
+  local $Carp::Internal{'TryCatch::Basic'} = 1;
   local $Carp::Internal{'Devel::Declare'} = 1;
   local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
   local $Carp::Internal{'Devel::PartialDump'} = 1;
