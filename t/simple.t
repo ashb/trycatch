@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 6;
+use Test::More;
 
 BEGIN { use_ok "TryCatch" or BAIL_OUT("Cannot load TryCatch") };
 
@@ -61,3 +61,4 @@ sub foo {
     return 1;
 }
 
+done_testing;
