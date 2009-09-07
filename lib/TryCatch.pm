@@ -298,11 +298,13 @@ sub parse_proto_using_pms {
 
   my $left = $sig->remaining_input;
 
-  croak "TryCatch can't handle un-named vars in catch signature"
-    unless $param->can('variable_name');
+  my $var_code = '';
 
-  my $name = $param->variable_name;
-  my $var_code = "my $name = \$TryCatch::Error;";
+  if (my $var_name = $param->can('variable_name') ) {
+
+    my $name = $param->$var_name();
+    $var_code = "my $name = \$TryCatch::Error;";
+  }
 
   # (TC $var)
   if ($param->has_type_constraints) {

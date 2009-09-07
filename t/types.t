@@ -16,5 +16,14 @@ catch ($e) {
   diag($e);
 }
 
+try {
+  require NoVarName;
+  pass("Types can be declared without a var name");
+}
+catch ($e) {
+  fail("Types can be declared without a var name");
+  diag($e);
+}
+
 done_testing;
 
