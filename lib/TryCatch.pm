@@ -223,7 +223,7 @@ sub block_postlude {
 # turn 'catch() {' into '->catch({ TC_check_code;'
 # the '->' is added by one of the postlude hooks
 sub _parse_catch {
-  my $ctx = shift;
+  my ($ctx) = @_;
 
   # Hide Devel::Declare from carp;
   local $Carp::Internal{'Devel::Declare'} = 1;
