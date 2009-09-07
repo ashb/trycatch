@@ -88,19 +88,6 @@ EOC
 is($line, 3, "Error from line 3");
 
 
-test_for_error(
-  qr/^'SomeRandomTC' could not be parsed to a type constraint .*? at \(eval \d+\) line (\d+)\b/,
-  "Undefined TC",
-  <<'EOC');
-use TryCatch;
-
-try { }
-catch (SomeRandomTC $e) {}
-
-EOC
-
-is($line, 4, "Error from line 4");
-
 compile_ok("try is not too reserved", <<'EOC');
 use TryCatch;
 
