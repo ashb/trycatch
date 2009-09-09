@@ -1,5 +1,8 @@
 Version history for TryCatch perl module:
 
+1.001001_999 - 2009/09/09
+  - Fix for issue with return/unwind when sub is called as a method (vpit)
+
 1.001001_99 - 2009/08/17
   - Fix a few bugs with nested try statements (return and errors not falling
     through as expected)
