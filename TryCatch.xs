@@ -88,7 +88,13 @@ STATIC OP* unwind_return (pTHX_ OP *op, void *user_data) {
   XPUSHs( (SV*)unwind);
   PUTBACK;
 
-  return CALL_FPTR(PL_ppaddr[OP_ENTERSUB])(aTHXR);
+  /* pp_entersub gets the XSUB arguments from @_ if there are any.
+   * Bypass this as we pushed the arguments directly on the stack. */
+
+  if (CvISXSUB(unwind))
+    AvFILLp(GvAV(PL_defgv)) = -1;
+
+  return CALL_FPTR(PL_ppaddr[OP_ENTERSUB])(aTHX);
 }
 
 
