@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 5;
+use Test::More;
 
 use TryCatch;
 
@@ -22,7 +22,9 @@ sub nested_2 {
 }
 
 is( nested_1(), "from nested_1", "nested try");
+is( main->nested_1(), "from nested_1", "nested try (as method)");
 is( nested_2(), "from nested_2", "call nested try");
+is( main->nested_2(), "from nested_2", "call nested try (as method)");
 
 # same thing, but now we return from within the catch
 sub nested_catch {
@@ -68,3 +70,5 @@ sub nested_rethrow {
 }
 
 is( nested_rethrow(), "caught in outer TC", "nested rethrow" );
+
+done_testing;
