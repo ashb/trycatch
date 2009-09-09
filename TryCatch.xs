@@ -7,6 +7,10 @@
 #include "hook_op_check.h"
 #include "hook_op_ppaddr.h"
 
+#ifndef CvISXSUB
+# define CvISXSUB(cv) CvXSUB(cv)
+#endif
+
 static int trycatch_debug = 0;
 
 STATIC I32
