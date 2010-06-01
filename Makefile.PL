@@ -23,7 +23,7 @@ my %run_deps = (
 );
 
 requires %run_deps;
-requires 'Parse::Method::Signatures' => '1.003011';
+requires 'Parse::Method::Signatures' => '1.003012';
 requires 'B::Hooks::EndOfScope' => 0.08;
 requires 'Devel::Declare' => '0.005007';
 requires 'Moose';

@@ -17,7 +17,7 @@ use XSLoader;
 use base qw/Devel::Declare::Context::Simple/;
 
 
-our $VERSION = '1.001001_999';
+our $VERSION = '1.002000';
 
 # These are private state variables. Mess with them at your peril
 our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH) = (undef, 0);

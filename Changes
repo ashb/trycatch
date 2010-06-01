@@ -1,5 +1,8 @@
 Version history for TryCatch perl module:
 
+1.002000 - 2009/09/13
+  - Fallback to treating str TCs as class names
+
 1.001001_999 - 2009/09/09
   - Fix for issue with return/unwind when sub is called as a method (vpit)
 
