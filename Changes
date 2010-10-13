@@ -1,5 +1,8 @@
 Version history for TryCatch perl module:
 
+1.003000 - 2010/10/13
+  - Fix issues with perl 5.12 (finally!)
+
 1.002000 - 2009/09/13
   - Fallback to treating str TCs as class names
 
