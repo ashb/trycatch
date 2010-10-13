@@ -84,6 +84,8 @@ TODO
 
     *   Write some more documentation
 
+    *   Split out the dependancy on Moose
+
 SEE ALSO
     MooseX::Types, Moose::Util::TypeConstraints, Parse::Method::Signatures.
 
@@ -95,6 +97,10 @@ THANKS
     and various B::Hooks modules
 
     Vincent Pit for Scope::Upper that makes the return from block possible.
+
+    Zefram for providing support and XS guidance.
+
+    Xavier Bergade for the impetus to finally fix this module in 5.12.
 
 LICENSE
     Licensed under the same terms as Perl itself.

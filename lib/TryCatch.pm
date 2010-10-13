@@ -19,13 +19,11 @@ use base qw/Devel::Declare::Context::Simple/;
 
 our $VERSION = '1.002000';
 
-# These are private state variables. Mess with them at your peril
-our ($CHECK_OP_HOOK, $CHECK_OP_DEPTH) = (undef, 0);
-our $NEXT_EVAL_IS_TRY;
+# Signal to the xs PL_check hooks.
+our $NEXT_EVAL_IS_TRY = 0;
 
-# Stack of state for tacking nested. Each value is number of catch blocks at
-# the current level. We are nested if @STATE > 1
-our (@STATE);
+# Constants
+my ($LOOKAHEAD_TRY, $LOOKAHEAD_CATCH) = (0,1);
 
 XSLoader::load(__PACKAGE__, $VERSION);
 
@@ -38,8 +36,6 @@ use Sub::Exporter -setup => {
     my ($args, $to_export) = @_;
     my $pack = $args->{into};
     my $ctx_class = $args->{parser} || 'TryCatch';
-
-    TryCatch::XS::install_try_op_check();
 
     foreach my $name (@$to_export) {
       if (my $parser = __PACKAGE__->can("_parse_${name}")) {
@@ -78,99 +74,58 @@ sub check_tc {
 sub _parse_try {
   my ($class,$pack, @args) = @_;
 
-  # Hide Devel::Declare from carp;
+  # Hide from carp - report errors from line of 'try {' in user source.
   local $Carp::Internal{'Devel::Declare'} = 1;
 
   my $ctx = $class->new->init(@args);
 
+  # Move parse head past 'try ' (space is optional
   $ctx->skip_declarator;
   $ctx->skipspace;
 
-  my $linestr = $ctx->get_linestr;
-
-  # Let "try =>" be valid.
-  return if substr($linestr, $ctx->offset, 2) eq '=>';
-
-  # Shadow try to be a constant no-op sub
+  # Shadow try to be a constant no-op sub. Hopefully
   $ctx->shadow(sub () { } );
 
   $ctx->inject_if_block(
-    $ctx->injected_try_code . $ctx->scope_injector_call('{}'),
-    q#;#
+    $ctx->inject_into_try . $ctx->scope_injector_call( $LOOKAHEAD_TRY ),
+    ';'
   ) or croak "block required after try";
 
-  #$ctx->debug_linestr("try");
-  if (! $TryCatch::CHECK_OP_DEPTH) {
-    $TryCatch::CHECK_OP_DEPTH++;
-    $TryCatch::CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
-  }
-
   $ctx->debug_linestr('post try');
-
-  # Number of catch blocks found, we only care about 0,1 and +1 cases tho
-  $ctx->state_new_block();
-  
 }
-
-
-sub injected_try_code {
-  # try { ...
-  # ->
-  # try; { local $@; eval { ...
-
-  return $_[0]->state_is_nested()
-       ? 'local $TryCatch::CTX = Scope::Upper::HERE; eval {' # Nested case
-       : 'local $@; eval {'
-}
-
-sub injected_after_try {
-  # This semicolon is for the end of the eval
-  return ';$TryCatch::Error = $@; } if ($TryCatch::Error) { ';
-}
-
-sub injected_no_catch_code {
-  # This undef is to ensure that there is the eval{}; is called in void context
-  # i.e that its not the last op in a subroutine
-  return "};undef;";
-}
-
-sub injected_post_catch_code {
-  # We do it like this so that PROPGATE gets called, in case anyone is using it
-  return 'else { $@ = $TryCatch::Error; die } };undef;';
-}
-
 
 sub scope_injector_call {
-  my $self = shift;
-  my $inject = shift;
-  return ' BEGIN { ' . ref($self) . "->inject_scope(${inject}) }; ";
+  my ($self, $state) = @_;
+  return ' BEGIN { ' . ref( $self ) . "->inject_scope($state) }; ";
 }
 
 
 sub inject_scope {
   my ($class, $opts) = @_;
 
-  if ($opts->{hook}) {
-    if (! $TryCatch::CHECK_OP_DEPTH) {
-      $TryCatch::CHECK_OP_DEPTH++;
-      $TryCatch::CHECK_OP_HOOK = TryCatch::XS::install_return_op_check();
-    }
-  }
+  my $hooks = TryCatch::XS::install_op_checks();
 
-  on_scope_end { 
-    $class->block_postlude() 
+  on_scope_end {
+    $class->lookahead_after_block( $opts );
+
+    # TODO: Rethink how i install the hooks. If i uninstall(/disable) them here
+    # then they get removed before the LEAVETRY check gets called. Probably
+    # switch to a single global set of hooks at look at %^H (?) for lexical
+    # goodness.
+
+    #TryCatch::XS::uninstall_op_checks( $hooks );
+    #undef $hooks;
   }
 }
 
 # Called after the block from try {} or catch {}
-# Look ahead and determine what action to take based on wether or note we
-# see a 'catch' token after the block
-sub block_postlude {
-  my ($class) = @_;
-  my $ctx = $class->new->init(
-    '', 
-    Devel::Declare::get_linestr_offset()
-  );
+#
+# Look ahead and determine what action to take based on wether or not we see
+# a 'catch' token after the block
+sub lookahead_after_block {
+  my ($class, $state) = @_;
+  my $orig_offset = Devel::Declare::get_linestr_offset();
+  my $ctx = $class->new->init( '', $orig_offset );
 
   my $offset = $ctx->skipspace;
   my $linestr = $ctx->get_linestr;
@@ -185,51 +140,49 @@ sub block_postlude {
     $ctx->{Declarator} = $toke;
   }
 
-  if ($TryCatch::CHECK_OP_DEPTH && --$TryCatch::CHECK_OP_DEPTH == 0) {
-    TryCatch::XS::uninstall_return_op_check($TryCatch::CHECK_OP_HOOK);
-    $TryCatch::CHECK_OP_HOOK = '';
-  }
-
   if ($toke eq 'catch') {
     # We don't want the 'catch' token in the output since it messes up the
     # if/else we build up. So dont let control go back to perl just yet.
 
-    $ctx->_parse_catch;
+    $ctx->_parse_catch( $state );
 
   } else  {
-
     # No (more) catch blocks, so write the postlude
     my $code;
-    if ($ctx->state_have_catch_block) {
-      $code = $ctx->injected_post_catch_code;
+    if ($state == $LOOKAHEAD_CATCH) {
+      $code = $ctx->inject_post_catch;
     }
     else {
-      $code = $ctx->injected_no_catch_code;
-      $TryCatch::NEXT_EVAL_IS_TRY = 1;
+      $code = $ctx->inject_when_no_catch;
+      $NEXT_EVAL_IS_TRY = 1;
     }
 
-    substr($linestr, $offset, 0, $code);
+    # Don't try this at home kids
+    #
+    # Since there was no 'catch' following, move back to the end of the
+    # closing brace (where offset was when we started). If we are after the
+    # skip space then the 'parse pointer' could be at the start of a POD line,
+    # and ";=head1" isn't valid perl ;)
+    #
+    # This seems to cause problems with nested try so taken out for now
+    #
+    #TryCatch::XS::set_linestr_offset($orig_offset);
+    #$ctx->{Offset} = $orig_offset;
 
+    substr($linestr, $ctx->offset, 0, $code);
 
     $ctx->set_linestr($linestr);
     $ctx->debug_linestr("finalizer");
-
-    # This try/catch stmt is finished
-    $ctx->state_end_block();
   }
 }
 
-
-# turn 'catch() {' into '->catch({ TC_check_code;'
-# the '->' is added by one of the postlude hooks
 sub _parse_catch {
-  my ($ctx) = @_;
+  my ($ctx, $state) = @_;
 
-  # Hide Devel::Declare from carp;
+  # Hide these things from carp - this makes C<croak> appear to come from the source line.
+  local $Carp::Internal{'TryCatch'} = 1;
   local $Carp::Internal{'Devel::Declare'} = 1;
   local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
-  local $Carp::Internal{'TryCatch'} = 1;
-  local $Carp::Internal{'TryCatch::Basic'} = 1;
 
   # This isn't a normal DD-callback, so we can strip_name to get rid of 'catch'
   my $offset = $ctx->offset;
@@ -248,18 +201,15 @@ sub _parse_catch {
 
   @conditions = ('1') unless @conditions;
 
-  unless ($ctx->state_have_catch_block()) {
-    $TryCatch::NEXT_EVAL_IS_TRY = 1;
-    $code = $ctx->injected_after_try
-          . "if (";
+  if ( $state != $LOOKAHEAD_CATCH ) {
+    $NEXT_EVAL_IS_TRY = 1;
+    $code = $ctx->inject_after_try . "if (";
   }
   else {
     $code = "elsif (";
   }
 
-  $var_code = $ctx->scope_injector_call( 
-    $ctx->state_is_nested() ? '{hook => 1}' : '{}'
-  ) . $var_code;
+  $var_code = $ctx->scope_injector_call( $LOOKAHEAD_CATCH ) . $var_code;
 
   $ctx->inject_if_block(
     $var_code,
@@ -268,7 +218,6 @@ sub _parse_catch {
 
   $ctx->debug_linestr('post catch');
 
-  $ctx->state_parsed_catch();
 }
 
 sub parse_proto {
@@ -335,28 +284,37 @@ sub parse_proto_using_pms {
   return $var_code, @conditions;
 }
 
-# Functions that wrap @STATE maniuplation into useful names
-sub state_new_block {
-  push @TryCatch::STATE, 0;
-  return
+
+#######################################################################
+# Injected snippets
+
+sub inject_into_try {
+  # try { ...
+  # ->
+  # try; { local $@; eval { ...
+
+  'local $@; eval {'
 }
 
-sub state_end_block {
-  pop @TryCatch::STATE;
-  return;
+sub inject_after_try {
+  # This semicolon is for the end of the eval
+  return ';$TryCatch::Error = $@; } if ($TryCatch::Error) { ';
 }
 
-sub state_is_nested {
-  return @TryCatch::STATE > 1;
+sub inject_when_no_catch {
+  # This undef is to ensure that there is the eval{}; is called in void context
+  # i.e that its not the last op in a subroutine
+  return "};undef;";
 }
 
-sub state_have_catch_block {
-  return $TryCatch::STATE[-1] > 0;
+sub inject_post_catch {
+  # We do it like this so that PROPGATE gets called, in case anyone is using it
+  return 'else { $@ = $TryCatch::Error; die } };undef;';
 }
 
-sub state_parsed_catch {
-  $TryCatch::STATE[-1]++;
-}
+#######################################################################
+
+require Devel::PartialDump if $ENV{TRYCATCH_DEBUG};
 
 *debug_linestr = !( ($ENV{TRYCATCH_DEBUG} || 0) & 1)
                ? sub {}
@@ -369,8 +327,6 @@ sub state_parsed_catch {
   local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
   local $Carp::Internal{'Devel::PartialDump'} = 1;
   Carp::cluck($message) if $message;
-
-  require Devel::PartialDump;
 
   warn   "  Substr: ", Devel::PartialDump::dump(substr($ctx->get_linestr, $ctx->offset)),
        "\n  Whole:  ", Devel::PartialDump::dump($ctx->get_linestr), "\n\n";
@@ -476,6 +432,10 @@ Decide on C<finally> semantics w.r.t return values.
 
 Write some more documentation
 
+=item *
+
+Split out the dependancy on Moose
+
 =back
 
 =head1 SEE ALSO
@@ -492,6 +452,10 @@ Thanks to Matt S Trout and Florian Ragwitz for work on L<Devel::Declare> and
 various B::Hooks modules
 
 Vincent Pit for L<Scope::Upper> that makes the return from block possible.
+
+Zefram for providing support and XS guidance.
+
+Xavier Bergade for the impetus to finally fix this module in 5.12.
 
 =head1 LICENSE
 

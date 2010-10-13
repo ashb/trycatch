@@ -19,6 +19,9 @@ EOC
 
 is($line, 4, "Error from line 4");
 
+# Its really *really* wierd that this 'fixes' things. I blame string evals
+eval "use TryCatch; try {} catch" if $] >= 5.011000;
+
 test_for_error(
   qr/^block required after catch at \(eval \d+\) line (\d+)\b/,
   "no block after catch",
