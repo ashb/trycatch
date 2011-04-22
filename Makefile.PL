@@ -32,6 +32,7 @@ requires 'Scope::Upper' => 0.06;
 requires 'Variable::Magic' => 0.28;
 requires 'Sub::Exporter' => 0.979;
 requires 'XSLoader';
+requires 'namespace::clean' => '0.20';
 
 resources repository => 'http://github.com/ashb/trycatch/tree/master';
 
