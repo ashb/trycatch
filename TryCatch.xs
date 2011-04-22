@@ -108,12 +108,12 @@ try_return (pTHX_ OP *op, void *user_data) {
 /* The implementation of wantarray op/keyword inside try blocks. */
 STATIC OP*
 try_wantarray( pTHX_ OP *op, void *user_data ) {
-  PERL_UNUSED_VAR(op);
-  PERL_UNUSED_VAR(user_data);
-
   dVAR;
   dSP;
   EXTEND(SP, 1);
+
+  PERL_UNUSED_VAR(op);
+  PERL_UNUSED_VAR(user_data);
 
   /* We want the context from the closest subroutine, not from the closest
    * block
