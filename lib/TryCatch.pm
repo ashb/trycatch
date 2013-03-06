@@ -182,13 +182,14 @@ sub _parse_catch {
   # Hide these things from carp - this makes C<croak> appear to come from the source line.
   local $Carp::Internal{'TryCatch'} = 1;
   local $Carp::Internal{'Devel::Declare'} = 1;
-  local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
+  local $Carp::Internal{'B::Hooks::EndOfScope::XS'} = 1;
+  local $Carp::Internal{'B::Hooks::EndOfScope::PP'} = 1;
 
   # This isn't a normal DD-callback, so we can strip_name to get rid of 'catch'
   my $offset = $ctx->offset;
   $ctx->strip_name;
   $ctx->skipspace;
- 
+
   $ctx->debug_linestr('catch');
   my $linestr = $ctx->get_linestr;
 
@@ -324,7 +325,8 @@ require Devel::PartialDump if $ENV{TRYCATCH_DEBUG};
   local $Carp::Internal{'TryCatch'} = 1;
   local $Carp::Internal{'TryCatch::Basic'} = 1;
   local $Carp::Internal{'Devel::Declare'} = 1;
-  local $Carp::Internal{'B::Hooks::EndOfScope'} = 1;
+  local $Carp::Internal{'B::Hooks::EndOfScope:XS'} = 1;
+  local $Carp::Internal{'B::Hooks::EndOfScope:PP'} = 1;
   local $Carp::Internal{'Devel::PartialDump'} = 1;
   Carp::cluck($message) if $message;
 
@@ -369,7 +371,7 @@ And also eval/if isn't the nicest idiom.
 This module aims to give first class exception handling to perl via 'try' and
 'catch' keywords. The basic syntax this module provides is C<try { # block }>
 followed by zero or more catch blocks. Each catch block has an optional type
-constraint on it the resembles Perl6's method signatures. 
+constraint on it the resembles Perl6's method signatures.
 
 Also worth noting is that the error variable (C<$@>) is localised to the
 try/catch blocks and will not leak outside the scope, or stomp on a previous
@@ -398,7 +400,7 @@ In addition to type checking via Moose type constraints, you can also use where
 clauses to only match a certain sub-condition on an error. For example,
 assuming that C<HTTPError> is a suitably defined TC:
 
- catch (HTTPError $e where { $_->code >= 400 && $_->code <= 499 } ) { 
+ catch (HTTPError $e where { $_->code >= 400 && $_->code <= 499 } ) {
    return "4XX error";
  }
  catch (HTTPError $e) {
@@ -415,7 +417,7 @@ the type constraints (if any) will executed.
 
 B<return>. You can put a return in a try block, and it would do the right thing
 - namely return a value from the subroutine you are in, instead of just from
-the eval block. 
+the eval block.
 
 B<Type Checking>. This is nothing you couldn't do manually yourself, it does it
 for you using Moose type constraints.

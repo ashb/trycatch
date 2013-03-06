@@ -24,7 +24,7 @@ my %run_deps = (
 
 requires %run_deps;
 requires 'Parse::Method::Signatures' => '1.003012';
-requires 'B::Hooks::EndOfScope' => 0.08;
+requires 'B::Hooks::EndOfScope' => 0.12;
 requires 'Devel::Declare' => '0.005007';
 requires 'Moose';
 requires 'MooseX::Types';
@@ -46,7 +46,7 @@ my $ok = 1;
 can_use('ExtUtils::Depends') or do {
   warn "***\n* Your CPAN toolchain is out of date. Please upgrade it\n***\n"; sleep 5;
   requires %config_deps;
-  
+
 };
 
 # Since we can bundle things under inc, do so. That way it should be easier to
