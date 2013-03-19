@@ -1,6 +1,6 @@
 Version history for TryCatch perl module:
 
-1.003001 -
+1.003001 - 2013/03/19
   - Fix (the test failure in t/invalid where) syntax errors are reported from
     the wrong location.
 

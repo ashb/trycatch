@@ -17,7 +17,7 @@ use XSLoader;
 use base qw/Devel::Declare::Context::Simple/;
 
 
-our $VERSION = '1.003000';
+our $VERSION = '1.003001';
 
 # Signal to the xs PL_check hooks.
 our $NEXT_EVAL_IS_TRY = 0;
