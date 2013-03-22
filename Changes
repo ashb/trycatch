@@ -1,5 +1,9 @@
 Version history for TryCatch perl module:
 
+{{$NEXT}}
+ - Fix the xml_sax_expat test to check for dependencies correctly. (Who wrote
+   that shoddy... oh wait it was me.)
+
 1.003001 - 2013/03/19
   - Fix (the test failure in t/invalid where) syntax errors are reported from
     the wrong location.

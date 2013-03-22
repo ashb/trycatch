@@ -4,12 +4,14 @@ use Test::More;
 
 use TryCatch;
 
-
-try {
-  require XML::SAX::Expat;
-}
-catch ($e where { qr{Can't load XML/SAX/Expat} } ) {
-  plan skip_all => 'This test requires XML::SAX::Expat';
+BEGIN {
+  try {
+    require XML::SAX::Base;
+    require XML::SAX::Expat;
+  }
+  catch ($e where { m{Can't locate XML/SAX/(?:Expat|Base)} } ) {
+    plan skip_all => 'This test requires XML::SAX::Expat and XML::SAX::Base';
+  }
 }
 
 # Use an explict plan since the problem was that it didn't behave and catch properly.
