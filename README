@@ -58,7 +58,7 @@ SYNTAX
     use where clauses to only match a certain sub-condition on an error. For
     example, assuming that "HTTPError" is a suitably defined TC:
 
-     catch (HTTPError $e where { $_->code >= 400 && $_->code <= 499 } ) { 
+     catch (HTTPError $e where { $_->code >= 400 && $_->code <= 499 } ) {
        return "4XX error";
      }
      catch (HTTPError $e) {
