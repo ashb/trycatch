@@ -142,7 +142,7 @@ sub lookahead_after_block {
 
   if ($toke eq 'catch') {
     # We don't want the 'catch' token in the output since it messes up the
-    # if/else we build up. So dont let control go back to perl just yet.
+    # if/else we build up. So do not let control go back to perl just yet.
 
     $ctx->_parse_catch( $state );
 
