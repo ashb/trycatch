@@ -142,7 +142,7 @@ sub lookahead_after_block {
 
   if ($toke eq 'catch') {
     # We don't want the 'catch' token in the output since it messes up the
-    # if/else we build up. So don't let control go back to perl just yet.
+    # if/else we build up. So do not let control go back to perl just yet.
 
     $ctx->_parse_catch( $state );
 
@@ -387,7 +387,7 @@ lexical variable by providing a simple signature to the catch block as follows:
 
  catch ($err) { ... }
 
-Type checking of the exception can be performed by specifying a type constraint
+Type checking of the exception can be performed by specifing a type constraint
 or where clauses in the signature as follows:
 
  catch (TypeFoo $e) { ... }
@@ -436,7 +436,7 @@ Write some more documentation
 
 =item *
 
-Split out the dependency on Moose
+Split out the dependancy on Moose
 
 =back
 

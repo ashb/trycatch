@@ -11,3 +11,5 @@ MANIFEST
 META.json
 *.bak
 TryCatch-*
+MYMETA.json
+MYMETA.yml

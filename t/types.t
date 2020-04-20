@@ -9,10 +9,10 @@ use TryCatch;
 
 try {
   require NoType;
-  pass("Types dont need to be pre-declared");
+  pass("Types do not need to be pre-declared");
 }
 catch ($e) {
-  fail("Types dont need to be pre-declared");
+  fail("Types do not need to be pre-declared");
   diag($e);
 }
 
